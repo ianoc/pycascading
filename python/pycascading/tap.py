@@ -184,11 +184,9 @@ class Flow(object):
         """
         return _Cache(self, identifier, refresh)
 
-    def run(self, num_reducers=50, config=None):
-        """Start the Cascading job.
-
-        We call this when we are done building the pipeline and explicitly want
-        to start the flow process.
+    def __get_active_sources(self):
+        """ Get the sources/taps in use by this flow.
+            Avoids warnings from cascading that taps arn't connected to anything
         """
         sources_used = set([])
         for tail in self.tails:
@@ -198,11 +196,28 @@ class Flow(object):
         for source in self.source_map.iterkeys():
             if source in sources_used:
                 source_map[source] = self.source_map[source]
+        
+        return source_map
+
+    def run(self, num_reducers=50, config=None):
+        """Start the Cascading job.
+
+        We call this when we are done building the pipeline and explicitly want
+        to start the flow process.
+        """
+        source_map = self.__get_active_sources()
         tails = [t.get_assembly() for t in self.tails]
         import pycascading.pipe
         Util.run(num_reducers, pycascading.pipe.config, source_map, \
                  self.sink_map, tails)
-
+        
+    def writeDOT(self, filename):
+        """ Write a dot file graph of the flow configured.
+            Given the behaviour of the run prior we follow the same behaviour here
+        """
+        source_map = self.__get_active_sources()
+        tails = [t.get_assembly() for t in self.tails]
+        Util.writeDOT(filename, source_map, self.sink_map, tails)
 
 class _Sink(Chainable):
 

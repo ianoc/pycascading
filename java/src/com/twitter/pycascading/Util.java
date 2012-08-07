@@ -189,4 +189,11 @@ public class Util {
     }
     flow.complete();
   }
+  
+  public static void writeDOT(String filename, Map<String, Tap> sources,
+                         Map<String, Tap> sinks, Pipe... tails) throws IOException, URISyntaxException {
+    FlowConnector flowConnector = new HadoopFlowConnector();
+    Flow flow = flowConnector.connect(sources, sinks, tails);
+    flow.writeDOT(filename);
+  }
 }
