@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 
-"""Simple word count example."""
+"""Simple simple example  of using a streaming map task which will do a word count."""
 
 from pycascading.helpers import *
 
