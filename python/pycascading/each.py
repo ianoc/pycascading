@@ -19,6 +19,7 @@
 * Map fields to new fields: map_replace
 * Map the whole tuple to the new tuple: map_to
 * Filter tuples: filter_by
+* Add fields to the stream using a streaming task: stream_add
 """
 
 __author__ = 'Gabor Szabo'
@@ -28,7 +29,7 @@ import inspect
 
 import cascading.pipe
 from cascading.tuple import Fields
-
+from com.twitter.pycascading import CascadingStreamFunctionWrapper
 from com.twitter.pycascading import CascadingFunctionWrapper, \
 CascadingFilterWrapper
 
@@ -56,34 +57,34 @@ class _Each(Operation):
         """
         Operation.__init__(self)
 
-        self.__function = None
+        self._function = None
         # The default argument selector is Fields.ALL (per Cascading sources
         # for Operator.java)
-        self.__argument_selector = None
+        self._argument_selector = None
         # The default output selector is Fields.RESULTS (per Cascading sources
         # for Operator.java)
-        self.__output_selector = None
+        self._output_selector = None
 
         if len(args) == 1:
-            self.__function = args[0]
+            self._function = args[0]
         elif len(args) == 2:
-            (self.__argument_selector, self.__function) = args
+            (self._argument_selector, self._function) = args
         elif len(args) == 3:
-            (self.__argument_selector, self.__function,
-             self.__output_selector) = args
+            (self._argument_selector, self._function,
+             self._output_selector) = args
         else:
             raise Exception('The number of parameters to Apply/Filter ' \
                             'should be between 1 and 3')
         # This is the Cascading Function type
-        self.__function = wrap_function(self.__function, function_type)
+        self._function = wrap_function(self._function, function_type)
 
     def _create_with_parent(self, parent):
         args = []
-        if self.__argument_selector:
-            args.append(coerce_to_fields(self.__argument_selector))
-        args.append(self.__function)
-        if self.__output_selector:
-            args.append(coerce_to_fields(self.__output_selector))
+        if self._argument_selector:
+            args.append(coerce_to_fields(self._argument_selector))
+        args.append(self._function)
+        if self._output_selector:
+            args.append(coerce_to_fields(self._output_selector))
         # We need to put another Pipe after the Each since otherwise
         # joins may not work as the names of pipes apparently have to be
         # different for Cascading.
@@ -91,6 +92,63 @@ class _Each(Operation):
         return cascading.pipe.Pipe(random_pipe_name('each'), each)
 
 
+class _StreamingEach(_Each):
+
+    """The equivalent of Each in Cascading.
+
+    We need to wrap @maps and @filters with different Java classes, but
+    the constructors for Each are built similarly. This class provides this
+    functionality.
+    """
+
+    def __init__(self, function_type, *args):
+        """Build the Each constructor for the Python function.
+
+        Arguments:
+        function_type -- CascadingFunctionWrapper or CascadingFilterWrapper,
+            whether we are calling Each with a function or filter
+        *args -- the arguments passed on to Cascading Each
+        """
+        Operation.__init__(self)
+
+        self._function = None
+        # The default argument selector is Fields.ALL (per Cascading sources
+        # for Operator.java)
+        self._argument_selector = None
+        # The default output selector is Fields.RESULTS (per Cascading sources
+        # for Operator.java)
+        self._output_selector = None
+
+        self._output_fields = None
+        
+        
+        if len(args) == 1:
+            self._function = args[0]
+        elif len(args) == 2:
+            (self._argument_selector, self._function) = args
+        elif len(args) == 3:
+            (self._argument_selector, self._function,
+             self.__output_selector) = args
+        elif len(args) == 4:
+            (self._argument_selector, self._function,
+             self.__output_selector, self._output_fields) = args
+        else:
+            raise Exception('The number of parameters to Apply/Filter ' \
+                            'should be between 1 and 3')
+        # This is the Cascading Function type
+        fw = function_type(coerce_to_fields(self._output_fields))
+        fw.setFunction(self._function)
+        self._function = fw
+    
+    
+class StreamApply(_StreamingEach):
+    """Apply the given user-defined scripting job to each tuple in the stream.
+
+    The corresponding class in Cascading is Each called with a Function.
+    """
+    def __init__(self, *args):
+        _StreamingEach.__init__(self, CascadingStreamFunctionWrapper, *args)
+        
 class Apply(_Each):
     """Apply the given user-defined function to each tuple in the stream.
 
@@ -171,7 +229,7 @@ def map_replace(*args):
     * One argument: it's the map function. The output fields will be named
       after the 'produces' parameter if the map function is decorated, or
       will be Fields.UNKNOWN if it's not defined. Note that after UNKNOW field
-      names are introduced to the tuple, all the other field names are also
+      names are introducefd to the tuple, all the other field names are also
       lost.
     * Two arguments: it's either the input field selector and the map function,
       or the map function and the output fields' names.
@@ -199,3 +257,27 @@ def filter_by(function):
     else:
         df = udf(type='filter')(function)
     return Filter(df)
+
+
+def _stream_map(output_selector, *args):
+    """Maps the given input fields to output fields."""
+    if len(args) == 1:
+        (input_selector, execute_script, output_field) = \
+        (Fields.ALL, args[0], Fields.UNKNOWN)
+    elif len(args) == 2:
+        # The first argument is a function, the second is the output fields
+        (input_selector, execute_script, output_field) = \
+        (Fields.ALL, args[0], args[1])
+    elif len(args) == 3:
+        (input_selector, execute_script, output_field) = args
+    else:
+        raise Exception('map_{add,replace} needs to be called with 1 to 3 parameters')
+    fields = coerce_to_fields(output_field)
+    return StreamApply(input_selector, execute_script, output_selector, fields)
+
+def stream_map_to(*args):
+    """Map the tuple, and keep only the results returned by the function."""
+    return _stream_map(Fields.RESULTS, *args)
+
+def stream_add(*args):
+    return _stream_map(Fields.ALL, *args)
