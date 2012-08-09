@@ -41,7 +41,7 @@ import cascading.tuple.Fields;
 import cascading.tuple.TupleEntry;
 
 
-
+import java.io.File;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -113,9 +113,24 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
   public void prepare(FlowProcess flowProcess, OperationCall operationCall) {
     JobConf jobConf = ((HadoopFlowProcess) flowProcess).getJobConf();
     
+    
+    String sourceDir = null;
+    if ("hadoop".equals(jobConf.get("pycascading.running_mode"))) {
+      try {
+        Path[] archives = DistributedCache.getLocalCacheArchives(jobConf);
+        sourceDir = archives[1].toString() + "/";
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    } 
+    
+    
     try {
       ProcessBuilder builder = new ProcessBuilder(this.commandLine.split(" "));
       builder.redirectErrorStream(true);
+      if(sourceDir != null) {
+        builder.directory(new File(sourceDir));
+      }
       this.childProcess = builder.start();
     } catch (IOException e) {
         throw new RuntimeException(e);
