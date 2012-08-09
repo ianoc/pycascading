@@ -56,20 +56,37 @@ import cascading.tuple.TupleEntry;
 
 
 /**
- * Wrapper for a Cascading BaseOperation that prepares the input tuples for a
- * Python function. It can convert between tuples and Python lists and dicts.
+ * Wrapper for a Cascading BaseOperation that:
+ *  * Launches and controls the sub process that streaming communicates with
+ *  * Prepares the input tuples for a the streaming client process.
+ *  * Parses the output of the client process for the generating of resulting tuples.
  * 
- * @author Gabor Szabo
+ * @author Ian O Connell
  */
+
 @SuppressWarnings({ "rawtypes", "deprecation" })
 public class CascadingBaseStreamingOperationWrapper extends BaseOperation implements Serializable {
   private static final long serialVersionUID = -535185466322890691L;
+  
+  // Buffer size used when dealing with the sub process
+  private final static int BUFFER_SIZE = 128 * 1024; 
 
+  // Streams for interacting with stdin/stdout of the streaming subprocess
+  DataOutputStream stdoutStream = null;
+  BufferedReader stdinStream = null;
+  
+  // streaming sub process object
+  Process childProcess = null;
+  
+  // blocking queue to allow passing back stdout from the monitor thread
+  BlockingQueue<String> childProcessOutputQueue;
+  
+  // Thread that reads from the stdout of the subprocess
+  ChildOutputReader child;
+  
+  // Command line string passed in that will give the streaming process
   protected String commandLine;
 
-  /**
-   * This is necessary for the deserialization.
-   */
   public CascadingBaseStreamingOperationWrapper() {
     super();
   }
@@ -86,17 +103,12 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
     super(numArgs, fieldDeclaration);
   }
 
-  private final static int BUFFER_SIZE = 128 * 1024;
-
-  DataOutputStream stdoutStream = null;
-  BufferedReader stdinStream = null;
-  Process childProcess = null;
-  BlockingQueue<String> childProcessOutputQueue;
-  ChildOutputReader child;
-  // We need to delay the deserialization of the Python functions up to this
-  // point, since the sources are in the distributed cache, whose location is in
-  // the jobconf, and we get access to the jobconf only at this point for the
-  // first time.
+  
+  /**
+   * The init steps on each node, here we need to start the subprocess
+   * and hook up the pipes so we can communicate with it
+   * 
+   */
   @Override
   public void prepare(FlowProcess flowProcess, OperationCall operationCall) {
     JobConf jobConf = ((HadoopFlowProcess) flowProcess).getJobConf();
@@ -117,13 +129,6 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
     child.start();
   }
 
-  /**
-   * We assume that the Python functions (map and reduce) are always called with
-   * the same number of arguments. Override this to return the number of
-   * arguments we will be passing in all the time.
-   * 
-   * @return the number of arguments the wrapper is passing in
-   */
   public int getNumParameters() {
     return 0;
   }
@@ -144,6 +149,13 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
     }
   }
 
+  /**
+   * This flushes the in memory thread safe queue of data we have that came back from the process
+   * We bring it back to the main thread and then add it to the outputCollector
+   * Here we presume the subprocess's output is tab seperated(bad)
+   * We check to see if we are missing tuples at the end, if so we add null's
+   *
+   */
   public void flushOutput(TupleEntryCollector outputCollector) {
     String current = childProcessOutputQueue.poll();
     while(current != null) {
@@ -152,11 +164,21 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
         for (String s : strTuple) {
           result.add(s);
         }
+        while(result.size() < fieldDeclaration.size()) {
+          result.add(null);
+        }
+        
         outputCollector.add(result);
         current = childProcessOutputQueue.poll();
     }
   }
   
+  /**
+   * We call this when we have stopped passing data to the child process.
+   * We close off the stdin pipe which should cause the process to gracefully exit.
+   * After that we wait for thread to finish up and then flush the buffers one last time
+   */
+   
   public void finishOutput(TupleEntryCollector outputCollector) {
     try {
       stdoutStream.close();
@@ -178,20 +200,13 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
   public void setFunction(String commandLine) {
     this.commandLine = commandLine;
   }
-  /**
-   * The Python callback function to call to get the source of a PyFunction. We
-   * better do it in Python using the inspect module, than hack it around in
-   * Java.
-   * 
-   * @param callBack
-   *          the PyFunction that is called to get the source of a Python
-   *          function
-   */
-  public void setWriteObjectCallBack(Object callBack) {
-   
-  }
-
   
+  /**
+   * This Thread is launched to block on the stdout from the child process much as how the Hadoop Streaming class works.
+   * This code is originally based on this with modifications as the Cascading collector cannot be presumed to be thread safe
+   * unlike the Hadoop one. As such this thread writes to a thread safe queue which must be fetched from the main thread
+   * and then written to the collector
+   */
   class ChildOutputReader extends Thread {
     private BufferedReader outReader;
     private BlockingQueue<String> outCollector;
@@ -203,11 +218,9 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
 
     public void run() {
       try {
-        String inputLine;// = outReader.readLine();
-        // 3/4 Tool to Hadoop
+        String inputLine;
         while ((inputLine = outReader.readLine()) != null) {
           outCollector.add(inputLine);
-          //inputLine = outReader.readLine();
         }
       } catch (IOException ex) {
 

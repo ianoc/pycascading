@@ -25,12 +25,12 @@ import cascading.tuple.Fields;
 import cascading.tuple.TupleEntryCollector;
 
 /**
- * Wrapper for a Cascading Function that calls a Python function.
+ * Wrapper function which the python streaming calls use for execution.
  * 
- * @author Gabor Szabo, Ian O Connell
+ * @author Ian O Connell
  */
 @SuppressWarnings("rawtypes")
-public class CascadingStreamFunctionWrapper extends CascadingStreamingRecordProducerWrapper implements Function,
+public class CascadingStreamFunctionWrapper extends CascadingBaseStreamingOperationWrapper implements Function,
         Serializable {
   private static final long serialVersionUID = -3512295576396796360L;
 
@@ -54,16 +54,23 @@ public class CascadingStreamFunctionWrapper extends CascadingStreamingRecordProd
   private TupleEntryCollector outputCollector = null;
   @Override
   public void operate(FlowProcess flowProcess, FunctionCall functionCall) {
+    // This will turn all the tuples into a single tab seperated string
+    // TODO: Do we need to escape tuples which have strings in them here?
     String inputTuple = functionCall.getArguments().getTuple().toString("\t");
     this.outputCollector = functionCall.getOutputCollector();
     callFunction(inputTuple);
+    // We currently flush after operating on each tuple,
+    // we may want to reduce this in future, but this is low enough overhead that
+    // we don't mind for now.
     flushOutput(this.outputCollector);
   }
   
   @Override
   public void flush( FlowProcess flowProcess, OperationCall operationCall )
   {
-     flushOutput(this.outputCollector);
+     if(this.outputCollector != null) {
+      flushOutput(this.outputCollector);
+     }
   }
   
   @Override
