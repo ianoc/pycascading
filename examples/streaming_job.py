@@ -13,13 +13,31 @@
 # limitations under the License.
 #
 
-"""Simple simple example  of using a streaming map task which will do a word count."""
+"""Simple example and test of using a streaming task.
+   One fork of the flow uses a streaming python job to split the lines into words and add 1's to the end of each line.
+   The other fork is basically the same achieved entirely within this current process. The diff of the outputs here should be the same.
+
+
+   * We use sum in the second fork also as if we use count it will produce an integer and then we will not be able to directly diff the outputs of both forks.
+"""
 
 from pycascading.helpers import *
 
 @udf_map(produces=['word', "extrachar"])
 def convert_str_to_int(tuple):
-    yield[tuple.get("word"), float(tuple.get("extrachar"))]
+    yield[tuple.get("word"), int(tuple.get("extrachar"))]
+
+@udf_map(produces=['word', 'extrachar'])
+def split_words(tuple):
+    """The function to split the line and return several new tuples.
+
+    The tuple to operate on is passed in as the first parameter. We are
+    yielding the results in a for loop back. Each word becomes the only field
+    in a new tuple stream, and the string to be split is the 2nd field of the
+    input tuple.
+    """
+    for word in tuple.get(1).split():
+        yield [word, 1]
 
 
 def main():
@@ -28,6 +46,8 @@ def main():
     # offset of the line in the file, and the second is the line as a string.
     input = flow.source(Hfs(TextLine(), 'pycascading_data/town.txt'))
     output = flow.tsv_sink('pycascading_data/out')
-
+    output2 = flow.tsv_sink('pycascading_data/out2')
     input | stream_map_to("python -u streaming_task.py", ["word", "extrachar"]) | convert_str_to_int | group_by('word', 'extrachar', native.sum("word_count")) | output
-    flow.run(num_reducers=1)
+    input | split_words | group_by('word', "extrachar", native.sum("word_count")) | output2
+
+    flow.run()
