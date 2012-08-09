@@ -8,6 +8,7 @@ for line in sys.stdin:
     line = line.strip()
     # split the line into words
     words = line.split()
+    words = words[1:]
     # increase counters
     for word in words:
         # write the results to STDOUT (standard output);
@@ -16,3 +17,4 @@ for line in sys.stdin:
         #
         # tab-delimited; the trivial word count is 1
         print '%s\t%s' % (word, 1)
+
