@@ -95,18 +95,17 @@ class _Each(Operation):
 class _StreamingEach(_Each):
 
     """The equivalent of Each in Cascading.
-
-    We need to wrap @maps and @filters with different Java classes, but
-    the constructors for Each are built similarly. This class provides this
-    functionality.
+       
+        Seperate from the other Each as we don't have to deal with decorated functions. Though
+        since we can't encode the selected output fields into the decorator those must be passed
+        through to this function to be useful.
     """
 
     def __init__(self, function_type, *args):
         """Build the Each constructor for the Python function.
 
         Arguments:
-        function_type -- CascadingFunctionWrapper or CascadingFilterWrapper,
-            whether we are calling Each with a function or filter
+        function_type -- CascadingStreamFunctionWrapper
         *args -- the arguments passed on to Cascading Each
         """
         Operation.__init__(self)
@@ -119,6 +118,7 @@ class _StreamingEach(_Each):
         # for Operator.java)
         self._output_selector = None
 
+        # The output fields we filter for from this operation, required for naming the output
         self._output_fields = None
         
         
@@ -134,8 +134,9 @@ class _StreamingEach(_Each):
              self.__output_selector, self._output_fields) = args
         else:
             raise Exception('The number of parameters to Apply/Filter ' \
-                            'should be between 1 and 3')
-        # This is the Cascading Function type
+                            'should be between 1 and 4')
+
+        #Replace the function object with the Java replaced object
         fw = function_type(coerce_to_fields(self._output_fields))
         fw.setFunction(self._function)
         self._function = fw
@@ -280,4 +281,24 @@ def stream_map_to(*args):
     return _stream_map(Fields.RESULTS, *args)
 
 def stream_add(*args):
+    """Map the tuple, and add the results returned by the function onto the existing tuple"""
     return _stream_map(Fields.ALL, *args)
+
+def stream_map_replace(*args):
+    """Map the tuple, remove the mapped fields, and add the new fields.
+
+    This mapping replaces the fields mapped with the new fields that the
+    mapping operation adds.
+
+    The number of arguments to this function is between 1 and 3:
+    * One argument: it's the map function. The output fields will be named
+      after the 'produces' parameter if the map function is decorated, or
+      will be Fields.UNKNOWN if it's not defined. Note that after UNKNOW field
+      names are introducefd to the tuple, all the other field names are also
+      lost.
+    * Two arguments: it's either the input field selector and the map function,
+      or the map function and the output fields' names.
+    * Three arguments: they are interpreted as the input field selector, the
+      map function, and finally the output fields' names.
+    """
+    return _stream_map(Fields.SWAP, *args)
