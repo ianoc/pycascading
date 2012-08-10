@@ -39,15 +39,24 @@ def split_words(tuple):
     for word in tuple.get(1).split():
         yield [word, 1]
 
+@udf_map(produces=['line'])
+def get_text(tuple):
+    yield [tuple.get(1)]
+
+@udf_map(produces=["word", "extrachar"])
+def parse_text(tuple):
+    first,_,second = tuple.get(1).partition("\t")
+    yield [first, second]
+
 
 def main():
     flow = Flow()
     # The TextLine() scheme produces tuples where the first field is the 
     # offset of the line in the file, and the second is the line as a string.
-    input = flow.source(Hfs(TextLine(), 'pycascading_data/town.txt'))
-    output = flow.tsv_sink('pycascading_data/out')
-    output2 = flow.tsv_sink('pycascading_data/out2')
-    input | stream_map_to("python -u streaming_task.py", ["word", "extrachar"]) | convert_str_to_int | group_by('word', 'extrachar', native.sum("word_count")) | output
-    input | split_words | group_by('word', "extrachar", native.sum("word_count")) | output2
+    input = flow.source(Hfs(TextLine(), sys.argv[1]))
+    output = flow.tsv_sink(sys.argv[2])
+    output2 = flow.tsv_sink(sys.argv[3])
+    input | get_text | stream_map_to(["python", "streaming_task.py"]) | parse_text | convert_str_to_int | group_by('word', 'extrachar', native.sum("word_count")) | output
+    #input | split_words | group_by('word', "extrachar", native.sum("word_count")) | output2
 
     flow.run()
