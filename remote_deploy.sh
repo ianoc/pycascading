@@ -85,6 +85,10 @@ Options:
                      command line parameters can be passed in this case for
                      the job.
 
+   -R <args>         Run the job immediately after submisison with SSH. The
+                     next parameter is taken to be the arguements which should
+                     be passed to the script.
+
 EOF
 }
 
@@ -121,7 +125,7 @@ run_immediately='dont_run'
 
 declare -a files_to_copy
 
-while getopts ":hmf:s:o:O:r" OPTION; do
+while getopts ":hmf:s:o:O:R:r" OPTION; do
 	case $OPTION in
 		h)	usage
          	exit 1
@@ -138,10 +142,12 @@ while getopts ":hmf:s:o:O:r" OPTION; do
             ;;
         r)  run_immediately='do_run'
             ;;
+        R)  run_immediately='do_run'
+            run_immediately_args="$OPTARG"
+	    ;;
 	esac
 done
 shift $((OPTIND-1))
-
 main_file="$1"
 if [ "$main_file" == "" -a $master_first == no ]; then
 	usage
@@ -167,6 +173,7 @@ fi
 if [ "$main_file" != "" ]; then
 	tar -c -z -f "$tmp_dir/sources.tgz" "$@"
     if [ ${#files_to_copy} -gt 0 ]; then
+	echo "Adding extra files for execution"
         tar -c -z -f "$tmp_dir/others.tgz" "${files_to_copy[@]}"
     fi
 fi
@@ -205,7 +212,9 @@ if [ -e sources.tgz ]; then
     echo "   \$deploy_dir/run.sh [parameters]"
 fi
 if [ \$1 == 'do_run' ]; then
-    \$deploy_dir/run.sh "\$@"
+    echo \$2
+    echo \$3
+    \$deploy_dir/run.sh \$2
 fi
 EOF
 chmod +x "$tmp_dir/setup.sh"
@@ -230,5 +239,5 @@ chmod +x "$tmp_dir/run.sh"
 cd "$tmp_dir"
 tar -c -z -h -f - . | ssh $server $ssh_options \
 "dir=\$(mktemp -d -t PyCascading-tmp-XXXXXX); cd \"\$dir\"; tar -x -z -f -; " \
-"./setup.sh $run_immediately \"\$@\"; rm -r \"\$dir\""
+"./setup.sh $run_immediately \"$run_immediately_args\" \"\$@\"; rm -r \"\$dir\""
 rm -r "$tmp_dir"
