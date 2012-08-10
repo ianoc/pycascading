@@ -56,29 +56,20 @@ public class CascadingStreamFunctionWrapper extends CascadingBaseStreamingOperat
   public void operate(FlowProcess flowProcess, FunctionCall functionCall) {
     // This will turn all the tuples into a single tab seperated string
     // TODO: Do we need to escape tuples which have strings in them here?
-    String inputTuple = functionCall.getArguments().getTuple().toString("\t");
-    this.outputCollector = functionCall.getOutputCollector();
+    String inputTuple = functionCall.getArguments().getTuple().get(0).toString();
     callFunction(inputTuple);
     // We currently flush after operating on each tuple,
     // we may want to reduce this in future, but this is low enough overhead that
     // we don't mind for now.
-    flushOutput(this.outputCollector);
+    flushOutput(functionCall.getOutputCollector());
   }
   
   @Override
   public void flush( FlowProcess flowProcess, OperationCall operationCall )
   {
-     if(this.outputCollector != null) {
-      flushOutput(this.outputCollector);
-     }
+    FunctionCall functionCall = (FunctionCall) operationCall;
+    finishOutput(functionCall.getOutputCollector());
   }
   
-  @Override
-  public void cleanup( FlowProcess flowProcess, OperationCall operationCall )
-  {
-      if(this.outputCollector != null) {
-        finishOutput(this.outputCollector);
-      }
-  }
 
 }

@@ -79,14 +79,16 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
   Process childProcess = null;
   
   // blocking queue to allow passing back stdout from the monitor thread
-  BlockingQueue<String> childProcessOutputQueue;
+  BlockingQueue<Tuple> childProcessOutputQueue;
   
   // Thread that reads from the stdout of the subprocess
-  ChildOutputReader child;
+  ChildOutputReader readerThread = null;
   
   // Command line string passed in that will give the streaming process
-  protected String commandLine;
+  protected String[] commandLine;
 
+  protected String recordSeperator = "\r\n";
+    
   public CascadingBaseStreamingOperationWrapper() {
     super();
   }
@@ -126,7 +128,7 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
     
     
     try {
-      ProcessBuilder builder = new ProcessBuilder(this.commandLine.split(" "));
+      ProcessBuilder builder = new ProcessBuilder(this.commandLine);
       builder.redirectErrorStream(true);
       if(sourceDir != null) {
         builder.directory(new File(sourceDir));
@@ -139,9 +141,9 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
                                                        childProcess.getOutputStream(),
                                                        BUFFER_SIZE));
     this.stdinStream = new BufferedReader(new InputStreamReader(childProcess.getInputStream()));
-    childProcessOutputQueue = new ArrayBlockingQueue<String>(10000);
-    child = new ChildOutputReader(stdinStream, childProcessOutputQueue);
-    child.start();
+    childProcessOutputQueue = new ArrayBlockingQueue<Tuple>(1000);
+    readerThread = new ChildOutputReader(stdinStream, childProcessOutputQueue);
+    readerThread.start();
   }
 
   public int getNumParameters() {
@@ -172,18 +174,9 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
    *
    */
   public void flushOutput(TupleEntryCollector outputCollector) {
-    String current = childProcessOutputQueue.poll();
+    Tuple current = childProcessOutputQueue.poll();
     while(current != null) {
-        String[] strTuple = current.split("\t");
-        Tuple result = new Tuple();
-        for (String s : strTuple) {
-          result.add(s);
-        }
-        while(result.size() < fieldDeclaration.size()) {
-          result.add(null);
-        }
-        
-        outputCollector.add(result);
+        outputCollector.add(current);
         current = childProcessOutputQueue.poll();
     }
   }
@@ -202,7 +195,7 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
       childProcess.waitFor();
     } catch (InterruptedException e) {}
     try {
-      child.join();
+      readerThread.join();
     } catch (InterruptedException e) {}
     flushOutput(outputCollector);
   }
@@ -212,10 +205,19 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
    * @param String
    *          the commandline 
    */
-  public void setFunction(String commandLine) {
+  public void setFunction(String[] commandLine) {
     this.commandLine = commandLine;
   }
   
+  
+   public void setRecordSeperators(String recordSeperator) {
+    this.recordSeperator = recordSeperator;
+    if (readerThread != null) {
+      readerThread.setRecordSeperators(recordSeperator);
+    }
+  }
+  
+
   /**
    * This Thread is launched to block on the stdout from the child process much as how the Hadoop Streaming class works.
    * This code is originally based on this with modifications as the Cascading collector cannot be presumed to be thread safe
@@ -224,19 +226,42 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
    */
   class ChildOutputReader extends Thread {
     private BufferedReader outReader;
-    private BlockingQueue<String> outCollector;
-    ChildOutputReader(BufferedReader outReader, BlockingQueue<String> outCollector) {
+    private BlockingQueue<Tuple> outCollector;
+    private String recordSeperators;
+    public void setRecordSeperators(String recordSeperators) {
+      this.recordSeperators = recordSeperators;
+    }
+    ChildOutputReader(BufferedReader outReader, BlockingQueue<Tuple> outCollector) {
+        this(outReader, outCollector, "\r\n");
+    }
+    ChildOutputReader(BufferedReader outReader, BlockingQueue<Tuple> outCollector, String recordSeperator) {
       setDaemon(true);
       this.outReader = outReader;
       this.outCollector = outCollector;
+      this.recordSeperators = recordSeperator;
     }
 
     public void run() {
       try {
-        String inputLine;
-        while ((inputLine = outReader.readLine()) != null) {
-          outCollector.add(inputLine);
-        }
+        char[] inputChar = new char[1];
+        int current_head_indx = 0;
+        int current_tuple_indx = 0;
+        StringBuilder currentBuffer = new StringBuilder();
+        while (outReader.read(inputChar) == 1) {
+          if(recordSeperators.indexOf(inputChar[0]) >= 0 ) {
+              if(currentBuffer.length() > 0) {
+                Tuple result = new Tuple();
+                result.add(current_tuple_indx);
+                result.add(currentBuffer.toString());
+                outCollector.add(result);
+                currentBuffer = new StringBuilder();
+                current_tuple_indx = current_head_indx + 1;
+              }
+          } else {
+              currentBuffer.append(inputChar[0]);
+          }
+          current_head_indx++;
+       }
       } catch (IOException ex) {
 
       }

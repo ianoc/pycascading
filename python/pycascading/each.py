@@ -117,28 +117,22 @@ class _StreamingEach(_Each):
         # The default output selector is Fields.RESULTS (per Cascading sources
         # for Operator.java)
         self._output_selector = None
+        self.__output_record_seperators = None
 
-        # The output fields we filter for from this operation, required for naming the output
-        self._output_fields = None
         
+        if len(args) != 4:
+            raise Exception('The number of parameters to Streaming each ' \
+                            'should be 4')
+        (self._argument_selector, self._function,
+         self.__output_selector, self.__output_record_seperators) = args
         
-        if len(args) == 1:
-            self._function = args[0]
-        elif len(args) == 2:
-            (self._argument_selector, self._function) = args
-        elif len(args) == 3:
-            (self._argument_selector, self._function,
-             self.__output_selector) = args
-        elif len(args) == 4:
-            (self._argument_selector, self._function,
-             self.__output_selector, self._output_fields) = args
-        else:
-            raise Exception('The number of parameters to Apply/Filter ' \
-                            'should be between 1 and 4')
 
         #Replace the function object with the Java replaced object
-        fw = function_type(coerce_to_fields(self._output_fields))
+        fw = function_type(coerce_to_fields(["offset", "text"]))
         fw.setFunction(self._function)
+        if self.__output_record_seperators is not None:
+            fw.setRecordSeperator(self.__output_record_seperators)
+        
         self._function = fw
     
     
@@ -260,31 +254,27 @@ def filter_by(function):
     return Filter(df)
 
 
-def _stream_map(output_selector, *args):
+def _stream_map(output_selector, *args, **kwargs):
     """Maps the given input fields to output fields."""
-    if len(args) == 1:
-        (input_selector, execute_script, output_field) = \
-        (Fields.ALL, args[0], Fields.UNKNOWN)
-    elif len(args) == 2:
-        # The first argument is a function, the second is the output fields
-        (input_selector, execute_script, output_field) = \
-        (Fields.ALL, args[0], args[1])
-    elif len(args) == 3:
-        (input_selector, execute_script, output_field) = args
-    else:
-        raise Exception('map_{add,replace} needs to be called with 1 to 3 parameters')
-    fields = coerce_to_fields(output_field)
-    return StreamApply(input_selector, execute_script, output_selector, fields)
+    # We only ever accept the first tuple
+    input_selector = Fields.FIRST
+    execute_script = args[0]
+    output_record_seperators = None
+    if "output_record_seperators" in kwargs:
+        output_record_seperators = kwargs["output_record_seperators"]
+    if not isinstance(execute_script, list):
+        raise Exception('stream_map_{add,replace} needs to be called where the function is a list')
+    return StreamApply(input_selector, execute_script, output_selector, output_record_seperators)
 
-def stream_map_to(*args):
+def stream_map_to(*args, **kwargs):
     """Map the tuple, and keep only the results returned by the function."""
-    return _stream_map(Fields.RESULTS, *args)
+    return _stream_map(Fields.RESULTS, *args, **kwargs)
 
-def stream_add(*args):
+def stream_add(*args, **kwargs):
     """Map the tuple, and add the results returned by the function onto the existing tuple"""
-    return _stream_map(Fields.ALL, *args)
+    return _stream_map(Fields.ALL, *args, **kwargs)
 
-def stream_map_replace(*args):
+def stream_map_replace(*args, **kwargs):
     """Map the tuple, remove the mapped fields, and add the new fields.
 
     This mapping replaces the fields mapped with the new fields that the
@@ -301,4 +291,4 @@ def stream_map_replace(*args):
     * Three arguments: they are interpreted as the input field selector, the
       map function, and finally the output fields' names.
     """
-    return _stream_map(Fields.SWAP, *args)
+    return _stream_map(Fields.SWAP, *args, **kwargs)
