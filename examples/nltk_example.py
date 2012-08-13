@@ -23,12 +23,21 @@
 
 from pycascading.helpers import *
 
+@udf_map(produces=['line'])
+def get_text(tuple):
+    yield [tuple.get(1)]
+
+@udf_map(produces=["word", "nlt"])
+def parse_stream_output(tuple):
+    first,_,second = tuple.get(1).partition("\t")
+    yield [first, second]
+
 def main():
     flow = Flow()
     # The TextLine() scheme produces tuples where the first field is the 
     # offset of the line in the file, and the second is the line as a string.
     input = flow.source(Hfs(TextLine(), 'pycascading_data/town.txt'))
     output = flow.tsv_sink('pycascading_data/out')
-    input | stream_map_to("python nltk_task_runner.py", ["word", "nlt"]) | group_by("nlt", native.count("nlt count")) | output
+    input | get_text | stream_map_to(["python", "nltk_task_runner.py"]) | parse_stream_output | group_by("nlt", native.count("nlt count")) | output
 
     flow.run()
