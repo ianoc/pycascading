@@ -25,9 +25,9 @@ usage()
     cat <<EOF
 Usage:
 
-$(basename "$0") <main_script.py> [parameters]
+$(basename "$0") [parameters]
 
-Runs the PyCascading script locally, without a Hadoop cluster.
+Runs a jython interactive shell with the Pycascading and hadoop jars loaded.
 
 Options:
    -h                Show this message
@@ -50,11 +50,6 @@ while getopts ":hj:" OPTION; do
 done
 shift $((OPTIND-1))
 
-main_file="$1"
-if [ "$main_file" == "" ]; then
-    usage
-    exit 1
-fi
 
 home_dir=$(dirname "$0")
 source ${home_dir}/configure_env.sh
@@ -64,6 +59,6 @@ if [ "$additional_jars" != "" ]; then
 fi
 
 # sys.path will be initialized from JYTHONPATH
-java -classpath "$classpath" \
-com.twitter.pycascading.Main "$home_dir/python/pycascading/bootstrap.py" \
-local "$home_dir" "$@"
+export CLASSPATH=$CLASSPATH:$classpath
+jython -i -Dpython.path="$classpath" \
+${home_dir}/python/pycascading/bootstrap_shell.py "${home_dir}/python" "$@"
