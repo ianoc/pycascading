@@ -94,26 +94,29 @@ class CascadingTestCase(unittest.TestCase):
         
     @staticmethod
     def map_run_flow(user_flow, input_str):
+        assert(isinstance(user_flow, Flow))
+        def gen_flow(input_path, output_path):
+            CascadingTestCase.remap_flow_sources(user_flow, mapping = {'*': input_path})
+            CascadingTestCase.remap_flow_sinks(user_flow, mapping = {'*' : output_path } )
+            return user_flow
+            
+        return CascadingTestCase.run_flow(gen_flow, input_str)
+    
+    @staticmethod
+    def run_flow(gen_flow, input_str):
         temp_directory = tempfile.mkdtemp()
-        fname_count = 0
-        dname_count = 0
         try:
-            assert(isinstance(user_flow, Flow))
+            
             #Take the input data received and write it to a temp input file to be read later
-            input_filename = "%s/f_%d" % (temp_directory, fname_count)
+            input_filename = "%s/input_file" % (temp_directory)
             f = open(input_filename, "wb")
             f.write(input_str)
             f.close()
-            fname_count += 1
-            
             #Generate the output path
-            output_path = "%s/d_%d" % (temp_directory, dname_count)
-            dname_count += 1
-            
-            #Take the flow and remap it onto these
-            CascadingTestCase.remap_flow_sources(user_flow, mapping = {'*': input_filename})
-            CascadingTestCase.remap_flow_sinks(user_flow, mapping = {'*' : output_path } )
-            user_flow.run(num_reducers=1)
+            output_path = "%s/out_dir" % (temp_directory)
+            flow = gen_flow(input_filename, output_path)
+            assert(isinstance(flow, Flow))
+            flow.run(num_reducers=1)
             produced_output_str = ""
             for output_file_name in os.listdir(output_path):
                 if output_file_name.startswith("part-"):
@@ -123,4 +126,8 @@ class CascadingTestCase(unittest.TestCase):
             return produced_output_str
         finally:
             shutil.rmtree(temp_directory)
+    
+    @staticmethod
+    def in_out_run_flow(flow_generator_function, input_str):
+        return CascadingTestCase.run_flow(flow_generator_function, input_str)
 

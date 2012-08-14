@@ -45,3 +45,16 @@ def get_flow():
 def main():
     flow = get_flow()
     flow.run(num_reducers=2)
+
+def get_flow2(source, dest):
+    flow = Flow()
+    # The TextLine() scheme produces tuples where the first field is the 
+    # offset of the line in the file, and the second is the line as a string.
+    input = flow.source(Hfs(TextLine(), source))
+    output = flow.tsv_sink(dest)
+    input | split_words | group_by('word', native.count()) | output
+    return flow
+    
+def main2():
+    flow = get_flow2('pycascading_data/town.txt', 'pycascading_data/out')
+    flow.run(num_reducers=2) 
