@@ -89,8 +89,10 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
   // Command line string passed in that will give the streaming process
   protected String[] commandLine;
 
-  protected String recordSeperator = "\r\n";
+  protected String recordSeperator = "\n";
     
+  protected boolean skipOffset = false;
+  
   public CascadingBaseStreamingOperationWrapper() {
     super();
   }
@@ -99,12 +101,25 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
     super(fieldDeclaration);
   }
 
+  public CascadingBaseStreamingOperationWrapper(Fields fieldDeclaration, boolean skipOffset) {
+    super(fieldDeclaration);
+    this.skipOffset = true;
+    assert(fieldDeclaration.size() == 1);
+  }
+  
   public CascadingBaseStreamingOperationWrapper(int numArgs) {
     super(numArgs);
   }
 
+  
   public CascadingBaseStreamingOperationWrapper(int numArgs, Fields fieldDeclaration) {
     super(numArgs, fieldDeclaration);
+  }
+  
+  public CascadingBaseStreamingOperationWrapper(int numArgs, Fields fieldDeclaration, boolean skipOffset) {
+    super(numArgs, fieldDeclaration);
+    this.skipOffset = true;
+    assert(fieldDeclaration.size() == 1);
   }
 
   
@@ -144,7 +159,7 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
                                                        BUFFER_SIZE));
     this.stdinStream = new BufferedReader(new InputStreamReader(childProcess.getInputStream()));
     childProcessOutputQueue = new ArrayBlockingQueue<ArrayList<Tuple>>(10);
-    readerThread = new ChildOutputReader(stdinStream, childProcessOutputQueue);
+    readerThread = new ChildOutputReader(stdinStream, childProcessOutputQueue, this.recordSeperator, this.skipOffset);
     readerThread.start();
   }
 
@@ -227,9 +242,6 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
   
    public void setRecordSeperators(String recordSeperator) {
     this.recordSeperator = recordSeperator;
-    if (readerThread != null) {
-      readerThread.setRecordSeperators(recordSeperator);
-    }
   }
   
 
@@ -243,17 +255,17 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
     private BufferedReader outReader;
     private BlockingQueue<ArrayList<Tuple>> outCollector;
     private String recordSeperators;
-    public void setRecordSeperators(String recordSeperators) {
-      this.recordSeperators = recordSeperators;
-    }
+    private boolean skipOffset;
+    
     ChildOutputReader(BufferedReader outReader, BlockingQueue<ArrayList<Tuple>> outCollector) {
-        this(outReader, outCollector, "\n");
+        this(outReader, outCollector, "\n", false);
     }
-    ChildOutputReader(BufferedReader outReader, BlockingQueue<ArrayList<Tuple>> outCollector, String recordSeperator) {
+    ChildOutputReader(BufferedReader outReader, BlockingQueue<ArrayList<Tuple>> outCollector, String recordSeperator, boolean skipOffset) {
       setDaemon(true);
       this.outReader = outReader;
       this.outCollector = outCollector;
       this.recordSeperators = recordSeperator;
+      this.skipOffset = skipOffset;
     }
 
     public void run() {
@@ -268,7 +280,9 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
           if(recordSeperators.indexOf(inputChar[0]) >= 0 ) {
               if(currentBuffer.length() > 0) {
                 Tuple result = new Tuple();
-                result.add(current_tuple_indx);
+                if(skipOffset == false) {
+                  result.add(current_tuple_indx);
+                }
                 result.add(currentBuffer.toString());
                 current_results_set.add(result);
                 currentBuffer = new StringBuilder();

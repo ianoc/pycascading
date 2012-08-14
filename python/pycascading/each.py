@@ -118,21 +118,27 @@ class _StreamingEach(_Each):
         # for Operator.java)
         self._output_selector = None
         self.__output_record_seperators = None
+        
+        self.__skipOffset = False
 
         
-        if len(args) != 4:
+        if len(args) != 5:
             raise Exception('The number of parameters to Streaming each ' \
-                            'should be 4')
+                            'should be 5')
         (self._argument_selector, self._function,
-         self._output_selector, self.__output_record_seperators) = args
+         self._output_selector, self.__output_record_seperators, self.__skipOffset) = args
         
 
         #Replace the function object with the Java replaced object
-        fw = function_type(coerce_to_fields(["stream_offset", "stream_output"]))
+        if(self.__skipOffset):
+            fw = function_type(coerce_to_fields(["stream_output"]),True)
+        else:
+            fw = function_type(coerce_to_fields(["stream_offset", "stream_output"]))
+            
         fw.setFunction(self._function)
         if self.__output_record_seperators is not None:
             fw.setRecordSeperator(self.__output_record_seperators)
-        
+
         self._function = fw
     
     
@@ -273,9 +279,15 @@ def _stream_map(output_selector, *args, **kwargs):
     
     if "output_record_seperators" in kwargs:
         output_record_seperators = kwargs["output_record_seperators"]
+        
+    if "skipOffset" in kwargs:
+        skipOffset = kwargs["skipOffset"]
+    else:
+        skipOffset = False
+        
     if not isinstance(execute_script, list):
         raise Exception('stream_map_{add,replace} needs to be called where the function is a list')
-    return StreamApply(input_selector, execute_script, output_selector, output_record_seperators)
+    return StreamApply(input_selector, execute_script, output_selector, output_record_seperators, skipOffset)
 
 def stream_map_to(*args, **kwargs):
     """Map the tuple, and keep only the results returned by the function."""

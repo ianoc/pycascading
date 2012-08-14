@@ -51,20 +51,20 @@ sadf\t1""")
             input = flow.source(Hfs(TextLine(), source))
             output = flow.tsv_sink(dest)
             #input | map_add("line", fake_streamer) | output
-            input | stream_add("line", ["python", "-u", os.path.join(cwd, "streaming_mapper_child_1.py")]) | retain("stream_output", "line") | output
+            input | stream_add("line", ["python", "-u", os.path.join(cwd, "streaming_mapper_child_1.py")], skipOffset=True) | output
             return flow
         
         def gen_alternate_flow(source,dest):
-            @udf_map(produces=["stream_offset", "stream_output"])
+            @udf_map(produces=["stream_output"])
             def fake_streamer(tuple):
                 for x in tuple.get(0).split(" "):
-                    yield [33, "%s\t1" % (x)]
+                    yield ["%s\t1" % (x)]
             flow = Flow()
             # The TextLine() scheme produces tuples where the first field is the 
             # offset of the line in the file, and the second is the line as a string.
             input = flow.source(Hfs(TextLine(), source))
             output = flow.tsv_sink(dest)
-            input | map_add("line", fake_streamer)  | retain("stream_output", "line") | output
+            input | map_add("line", fake_streamer)  | output
             return flow
         
         streaming_results = CascadingTestCase.in_out_run_flow(gen_streaming_flow, "my line one\nmy second line\nmy third line")
@@ -79,20 +79,48 @@ sadf\t1""")
             input = flow.source(Hfs(TextLine(), source))
             output = flow.tsv_sink(dest)
             #input | map_add("line", fake_streamer) | output
-            input | stream_replace("line", ["python", "-u", os.path.join(cwd, "streaming_mapper_child_1.py")]) | retain("stream_output") | output
+            input | stream_replace("line", ["python", "-u", os.path.join(cwd, "streaming_mapper_child_1.py")], skipOffset=True) | output
             return flow
         
         def gen_alternate_flow(source,dest):
-            @udf_map(produces=["stream_offset", "stream_output"])
+            @udf_map(produces=["stream_output"])
             def fake_streamer(tuple):
                 for x in tuple.get(0).split(" "):
-                    yield [33, "%s\t1" % (x)]
+                    yield ["%s\t1" % (x)]
             flow = Flow()
             # The TextLine() scheme produces tuples where the first field is the 
             # offset of the line in the file, and the second is the line as a string.
             input = flow.source(Hfs(TextLine(), source))
             output = flow.tsv_sink(dest)
-            input | map_replace("line", fake_streamer)  | retain("stream_output") | output
+            input | map_replace("line", fake_streamer) | output
+            return flow
+        
+        streaming_results = CascadingTestCase.in_out_run_flow(gen_streaming_flow, "my line one\nmy second line\nmy third line")
+        alternate_results = CascadingTestCase.in_out_run_flow(gen_alternate_flow, "my line one\nmy second line\nmy third line")
+        self.assertEqual(streaming_results, alternate_results)
+        
+    def testMapTo(self):
+        def gen_streaming_flow(source, dest):
+            flow = Flow()
+            # The TextLine() scheme produces tuples where the first field is the 
+            # offset of the line in the file, and the second is the line as a string.
+            input = flow.source(Hfs(TextLine(), source))
+            output = flow.tsv_sink(dest)
+            #input | map_add("line", fake_streamer) | output
+            input | retain("line") | stream_map_to(["python", "-u", os.path.join(cwd, "streaming_mapper_child_1.py")], skipOffset=True) | output
+            return flow
+        
+        def gen_alternate_flow(source,dest):
+            @udf_map(produces=["stream_output"])
+            def fake_streamer(tuple):
+                for x in tuple.get(0).split(" "):
+                    yield ["%s\t1" % (x)]
+            flow = Flow()
+            # The TextLine() scheme produces tuples where the first field is the 
+            # offset of the line in the file, and the second is the line as a string.
+            input = flow.source(Hfs(TextLine(), source))
+            output = flow.tsv_sink(dest)
+            input | retain("line") | map_to(fake_streamer) | output
             return flow
         
         streaming_results = CascadingTestCase.in_out_run_flow(gen_streaming_flow, "my line one\nmy second line\nmy third line")

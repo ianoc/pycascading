@@ -2,7 +2,6 @@
 
 import sys
 # input comes from STDIN (standard input)
-f = open("/tmp/rec", "w")
 line = sys.stdin.readline()
 while len(line) > 0:
     # remove leading and trailing whitespace
