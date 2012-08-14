@@ -57,6 +57,6 @@ def main():
     output = flow.tsv_sink(sys.argv[2])
     output2 = flow.tsv_sink(sys.argv[3])
 
-    input | get_text | stream_map_to(["python", "streaming_task.py"]) | parse_text | convert_str_to_int | group_by('word', 'extrachar', native.sum("word_count")) | output
-    input | split_words | group_by('word', "extrachar", native.sum("word_count")) | output2
+    input | get_text | stream_replace("line", ["python", "-u", "streaming_task.py"] ) | parse_text | convert_str_to_int | group_by('word', 'extrachar', native.sum("word_count")) | output
+    
     flow.run()

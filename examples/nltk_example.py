@@ -38,6 +38,6 @@ def main():
     # offset of the line in the file, and the second is the line as a string.
     input = flow.source(Hfs(TextLine(), 'pycascading_data/town.txt'))
     output = flow.tsv_sink('pycascading_data/out')
-    input | get_text | stream_map_to(["python", "nltk_task_runner.py"]) | parse_stream_output | group_by("nlt", native.count("nlt count")) | output
+    input | get_text | stream_map_to(["python", "-u", "nltk_task_runner.py"]) | parse_stream_output | group_by("nlt", native.count("nlt count")) | output
 
     flow.run()

@@ -2,7 +2,8 @@
 
 import sys
 # input comes from STDIN (standard input)
-for line in sys.stdin:
+line = sys.stdin.readline()
+while len(line) > 0:
     # remove leading and trailing whitespace
     line = line.strip()
     # split the line into words
@@ -16,4 +17,5 @@ for line in sys.stdin:
         #
         # tab-delimited; the trivial word count is 1
         print '%s\t%s' % (word, 1)
-
+    print ''
+    line = sys.stdin.readline()

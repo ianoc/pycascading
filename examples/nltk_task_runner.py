@@ -19,11 +19,14 @@ def tag(text):
     tokenized = tokenizer.tokenize(text)
     tagged = tagger.tag(tokenized)
     return tagged
-for line in sys.stdin:
+line = sys.stdin.readline()
+while len(line) > 0:
     # remove leading and trailing whitespace
     line = line.strip()
     line = line[line.find("\t") + 1:]
     tagged = tag(line)
 
     for word,tags in tagged:
-	print '%s\t%s' % (word, tags) 
+        print '%s\t%s' % (word, tags) 
+    print ''
+    line = sys.stdin.readline()
