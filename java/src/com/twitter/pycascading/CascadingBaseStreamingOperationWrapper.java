@@ -50,6 +50,8 @@ import java.io.DataOutputStream;
 import java.io.BufferedOutputStream;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
 import cascading.tuple.TupleEntryCollector;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
@@ -79,7 +81,7 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
   Process childProcess = null;
   
   // blocking queue to allow passing back stdout from the monitor thread
-  BlockingQueue<Tuple> childProcessOutputQueue;
+  BlockingQueue<ArrayList<Tuple>> childProcessOutputQueue;
   
   // Thread that reads from the stdout of the subprocess
   ChildOutputReader readerThread = null;
@@ -141,7 +143,7 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
                                                        childProcess.getOutputStream(),
                                                        BUFFER_SIZE));
     this.stdinStream = new BufferedReader(new InputStreamReader(childProcess.getInputStream()));
-    childProcessOutputQueue = new ArrayBlockingQueue<Tuple>(1000);
+    childProcessOutputQueue = new ArrayBlockingQueue<ArrayList<Tuple>>(10);
     readerThread = new ChildOutputReader(stdinStream, childProcessOutputQueue);
     readerThread.start();
   }
@@ -174,10 +176,23 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
    *
    */
   public void flushOutput(TupleEntryCollector outputCollector) {
-    Tuple current = childProcessOutputQueue.poll();
-    while(current != null) {
-        outputCollector.add(current);
-        current = childProcessOutputQueue.poll();
+    try {
+      ArrayList<Tuple> current = childProcessOutputQueue.poll(2, TimeUnit.MINUTES);
+      if(current == null) {
+        throw new RuntimeException("Timed out waiting for subprocess");
+      }
+      for (Tuple t : current) {
+        outputCollector.add(t);
+      }
+    }
+    catch (InterruptedException e) {} // If the process went away we just have no more tuples
+  }
+  
+  public void nonBlockFlushOutput(TupleEntryCollector outputCollector) {
+    ArrayList<Tuple> current = null;
+    while((current = childProcessOutputQueue.poll()) != null)
+    for (Tuple t : current) {
+      outputCollector.add(t);
     }
   }
   
@@ -197,7 +212,7 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
     try {
       readerThread.join();
     } catch (InterruptedException e) {}
-    flushOutput(outputCollector);
+    nonBlockFlushOutput(outputCollector);
   }
   /**
    * Setter for the command line args to be called.
@@ -226,15 +241,15 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
    */
   class ChildOutputReader extends Thread {
     private BufferedReader outReader;
-    private BlockingQueue<Tuple> outCollector;
+    private BlockingQueue<ArrayList<Tuple>> outCollector;
     private String recordSeperators;
     public void setRecordSeperators(String recordSeperators) {
       this.recordSeperators = recordSeperators;
     }
-    ChildOutputReader(BufferedReader outReader, BlockingQueue<Tuple> outCollector) {
-        this(outReader, outCollector, "\r\n");
+    ChildOutputReader(BufferedReader outReader, BlockingQueue<ArrayList<Tuple>> outCollector) {
+        this(outReader, outCollector, "\n");
     }
-    ChildOutputReader(BufferedReader outReader, BlockingQueue<Tuple> outCollector, String recordSeperator) {
+    ChildOutputReader(BufferedReader outReader, BlockingQueue<ArrayList<Tuple>> outCollector, String recordSeperator) {
       setDaemon(true);
       this.outReader = outReader;
       this.outCollector = outCollector;
@@ -242,20 +257,25 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
     }
 
     public void run() {
+      ArrayList<Tuple> current_results_set = null;
       try {
         char[] inputChar = new char[1];
         int current_head_indx = 0;
         int current_tuple_indx = 0;
         StringBuilder currentBuffer = new StringBuilder();
+        current_results_set = new ArrayList<Tuple>();
         while (outReader.read(inputChar) == 1) {
           if(recordSeperators.indexOf(inputChar[0]) >= 0 ) {
               if(currentBuffer.length() > 0) {
                 Tuple result = new Tuple();
                 result.add(current_tuple_indx);
                 result.add(currentBuffer.toString());
-                outCollector.add(result);
+                current_results_set.add(result);
                 currentBuffer = new StringBuilder();
                 current_tuple_indx = current_head_indx + 1;
+              } else {
+                outCollector.add(current_results_set);
+                current_results_set = new ArrayList<Tuple>();
               }
           } else {
               currentBuffer.append(inputChar[0]);
@@ -263,7 +283,10 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
           current_head_indx++;
        }
       } catch (IOException ex) {
-
+        if(current_results_set != null && current_results_set.size() > 0) {
+          outCollector.add(current_results_set);
+          current_results_set = null;
+        }
       }
     }
 

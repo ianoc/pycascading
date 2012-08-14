@@ -124,11 +124,11 @@ class _StreamingEach(_Each):
             raise Exception('The number of parameters to Streaming each ' \
                             'should be 4')
         (self._argument_selector, self._function,
-         self.__output_selector, self.__output_record_seperators) = args
+         self._output_selector, self.__output_record_seperators) = args
         
 
         #Replace the function object with the Java replaced object
-        fw = function_type(coerce_to_fields(["offset", "text"]))
+        fw = function_type(coerce_to_fields(["stream_offset", "stream_output"]))
         fw.setFunction(self._function)
         if self.__output_record_seperators is not None:
             fw.setRecordSeperator(self.__output_record_seperators)
@@ -257,9 +257,20 @@ def filter_by(function):
 def _stream_map(output_selector, *args, **kwargs):
     """Maps the given input fields to output fields."""
     # We only ever accept the first tuple
-    input_selector = Fields.FIRST
-    execute_script = args[0]
+    input_selector = None
+    execute_script = None
     output_record_seperators = None
+    
+    """Maps the given input fields to output fields."""
+    if len(args) == 1:
+       (input_selector, execute_script) = \
+       (Fields.FIRST, args[0])
+    elif len(args) == 2:
+       (input_selector, execute_script) = args
+    else:
+       raise Exception('map_{add,replace} needs to be called with 1 to 3 parameters')
+    
+    
     if "output_record_seperators" in kwargs:
         output_record_seperators = kwargs["output_record_seperators"]
     if not isinstance(execute_script, list):
@@ -274,7 +285,7 @@ def stream_add(*args, **kwargs):
     """Map the tuple, and add the results returned by the function onto the existing tuple"""
     return _stream_map(Fields.ALL, *args, **kwargs)
 
-def stream_map_replace(*args, **kwargs):
+def stream_replace(*args, **kwargs):
     """Map the tuple, remove the mapped fields, and add the new fields.
 
     This mapping replaces the fields mapped with the new fields that the
