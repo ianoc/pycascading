@@ -34,4 +34,5 @@ pycascading.pipe.config = dict()
 
 # pycascading.pipe.config is a dict with configuration parameters
 pycascading.pipe.config['pycascading.running_mode'] = running_mode
+pycascading.pipe.config['pycascading.main_file'] = 'stdin'
 
