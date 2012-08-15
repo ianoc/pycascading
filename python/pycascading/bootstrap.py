@@ -75,7 +75,7 @@ if __name__ == "__main__":
         if opt[0] == '-a':
             pycascading.pipe.config['pycascading.distributed_cache.archives'] \
             .append(opt[1])
-
+   
     if running_mode == 'hadoop':
         # The folder where the sources were extracted to be run in hadoop mode
         job_dir = args[0]
@@ -83,6 +83,7 @@ if __name__ == "__main__":
         sys.argv = args[1:]
         main_file = args[1]
         physical_file = job_dir + '/' + args[1]
+        sys.path.extend([job_dir])
     else:
         main_file = args[0]
         physical_file = args[0]
