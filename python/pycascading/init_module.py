@@ -55,7 +55,7 @@ def setup_paths(module_paths):
     # Allow importing of user-installed Jython packages
     # Thanks to Simon Radford
     import site
-    site.addsitedir(jython_dir + 'python/Lib/site-packages')
+    site.addsitedir(jython_dir + '/python/Lib/site-packages')
 
     # Haha... it's necessary to put this here, otherwise simplejson won't work.
     # Maybe it's automatically imported in the beginning of a Jython program,
