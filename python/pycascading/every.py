@@ -25,7 +25,7 @@ import cascading.operation
 from cascading.tuple import Fields
 
 from com.twitter.pycascading import CascadingAggregatorWrapper, \
-CascadingBufferWrapper
+CascadingBufferWrapper, CascadingStreamingBufferWrapper
 
 from pycascading.pipe import Operation, coerce_to_fields, wrap_function, \
 random_pipe_name, DecoratedFunction, _Stackable
@@ -108,6 +108,79 @@ class Every(Operation):
         every = cascading.pipe.Every(*args)
         return cascading.pipe.Pipe(random_pipe_name('every'), every)
 
+
+class StreamingEvery(Operation):
+
+    """Apply an operation to a group of tuples.
+
+    This operation is similar to Apply, but can only follow a GroupBy or
+    CoGroup. It runs a Cascading Aggregator or Buffer on every grouping.
+    Native Java aggregators or buffers may be used, and also PyCascading
+    @reduces.
+
+    By default the tuples contain only the values in a group, but not the
+    grouping field. This can be had from the group first parameter.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """Create a Cascading Every pipe.
+
+        Keyword arguments:
+        aggregator -- a Cascading aggregator (only either aggregator or buffer
+            should be used)
+        buffer -- a Cascading Buffer or a PyCascading @reduce function
+        output_selector -- the outputSelector parameter for Cascading
+        argument_selector -- the argumentSelector parameter for Cascading
+        assertion_level -- the assertionLevel parameter for Cascading
+        assertion -- the assertion parameter for Cascading
+        """
+        Operation.__init__(self)
+        self.__args = args
+        self.__kwargs = kwargs
+        self.__output_record_seperators = None
+
+    def __create_args(self,
+                      pipe=None,
+                      output_selector=None,
+                      assertion_level=None, assertion=None,
+                      buffer=None,
+                      argument_selector=None):
+        if self.__args:
+            # If we pass in an unnamed argument, try to determine its type
+            buffer = self.__args[0]
+
+        # Set up some defaults
+        if argument_selector is None:
+            argument_selector = cascading.tuple.Fields.ALL
+        if output_selector is None:
+            output_selector = cascading.tuple.Fields.RESULTS
+
+        args = []
+        args.append(pipe.get_assembly())
+        if argument_selector is not None:
+            args.append(coerce_to_fields(argument_selector))
+        if assertion_level is not None:
+            args.append(assertion_level)
+            args.append(assertion)
+        if buffer is None:
+            raise Exception("Buffer must be specified")
+             #Replace the function object with the Java replaced object
+        fw = CascadingStreamingBufferWrapper(coerce_to_fields(["stream_output"]))
+        
+        fw.setFunction(buffer)
+        if self.__output_record_seperators is not None:
+            fw.setRecordSeperator(self.__output_record_seperators)
+
+        args.append(fw)
+        if output_selector:
+            args.append(coerce_to_fields(output_selector))
+            
+        return args
+
+    def _create_with_parent(self, parent):
+        args = self.__create_args(pipe=parent, **self.__kwargs)
+        every = cascading.pipe.Every(*args)
+        return cascading.pipe.Pipe(random_pipe_name('every'), every)
 
 class GroupBy(Operation):
 
@@ -242,3 +315,21 @@ def group_by(*args, **kwargs):
             else:
                 return parent | GroupBy(**kwargs)
         return _DelayedInitialization(pipe)
+
+
+def streaming_group_by(*args, **kwargs):
+    if len(args) == 2:
+        grouping_fields = args[0]
+        (input_selector, function) = (Fields.ALL, args[1])
+    elif len(args) == 3:
+        grouping_fields = args[0]
+        (input_selector, function) = (args[1], args[2])
+    else:
+        raise Exception('streaming_group_by needs to be called with 2 to 3 parameters')
+
+    def pipe(parent):
+        return parent | GroupBy(grouping_fields, **kwargs) | \
+            StreamingEvery(function, argument_selector=input_selector)
+    return _DelayedInitialization(pipe)
+
+

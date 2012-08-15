@@ -19,8 +19,6 @@ import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.util.Iterator;
 
-import org.python.core.Py;
-
 import cascading.flow.FlowProcess;
 import cascading.operation.Buffer;
 import cascading.operation.BufferCall;
@@ -29,40 +27,36 @@ import cascading.tuple.TupleEntry;
 import cascading.tuple.TupleEntryCollector;
 
 /**
- * Wrapper for a Cascading Buffer that calls a Python function.
  * 
- * @author Gabor Szabo
+ * @author Ian O Connell
  */
 @SuppressWarnings("rawtypes")
-public class CascadingBufferWrapper extends CascadingRecordProducerWrapper implements Buffer,
+public class CascadingStreamingBufferWrapper extends CascadingBaseStreamingOperationWrapper implements Buffer,
         Serializable {
   private static final long serialVersionUID = -3512295576396796360L;
 
-  public CascadingBufferWrapper() {
+  public CascadingStreamingBufferWrapper() {
     super();
   }
 
-  public CascadingBufferWrapper(Fields fieldDeclaration) {
-    super(fieldDeclaration);
+  public CascadingStreamingBufferWrapper(Fields fieldDeclaration) {
+    super(fieldDeclaration, false);
   }
 
-  public CascadingBufferWrapper(int numArgs) {
+  public CascadingStreamingBufferWrapper(int numArgs) {
     super(numArgs);
   }
 
-  public CascadingBufferWrapper(int numArgs, Fields fieldDeclaration) {
+  public CascadingStreamingBufferWrapper(int numArgs, Fields fieldDeclaration) {
     super(numArgs, fieldDeclaration);
   }
 
-  private void readObject(ObjectInputStream stream) throws IOException, ClassNotFoundException {
-    setupArgs();
-  }
 
   public int getNumParameters() {
     return super.getNumParameters() + 1;
   }
 
-  @Override
+ @Override
   public void operate(FlowProcess flowProcess, BufferCall bufferCall) {
     // TODO: if the Python buffer expects Python dicts or lists, then we need to
     // convert the Iterator
@@ -75,16 +69,8 @@ public class CascadingBufferWrapper extends CascadingRecordProducerWrapper imple
     if (arguments.hasNext()) {
       TupleEntry group = bufferCall.getGroup();
       TupleEntryCollector outputCollector = bufferCall.getOutputCollector();
-
-      callArgs[0] = Py.java2py(group);
-      callArgs[1] = Py.java2py(arguments);
-      if (outputMethod == OutputMethod.COLLECTS) {
-        callArgs[2] = Py.java2py(outputCollector);
-        callFunction();
-      } else {
-        Object ret = callFunction();
-        collectOutput(outputCollector, ret);
-      }
+      callFunction(bufferCall.getOutputCollector(), group, arguments);
+      flushOutput(bufferCall.getOutputCollector());
     }
   }
 }

@@ -183,6 +183,28 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
     }
   }
 
+  public void callFunction(TupleEntryCollector outputCollector, TupleEntry group, Iterator<TupleEntry> arguments) {
+    try{
+      // Write out the group
+      stdoutStream.write(group.get(0).toString().getBytes("UTF-8"));
+      stdoutStream.write('\n');
+      int tuplesWritten = 0;
+      // Now write out the tuples for this group
+      while ( arguments.hasNext() ){ 
+         stdoutStream.write(arguments.next().get(0).toString().getBytes("UTF-8"));
+         stdoutStream.write('\n');
+         if(tuplesWritten % 100 == 0) {
+          nonBlockFlushOutput(outputCollector);
+         }
+         tuplesWritten++;
+         stdoutStream.flush();
+      }
+      stdoutStream.write('\n');
+      stdoutStream.flush();
+    } catch (IOException e) {
+        throw new RuntimeException(e);
+    }
+  }
   /**
    * This flushes the in memory thread safe queue of data we have that came back from the process
    * We bring it back to the main thread and then add it to the outputCollector
