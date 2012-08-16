@@ -38,6 +38,7 @@ from cascading.tap.hadoop import *
 from cascading.scheme.hadoop import TextLine, TextDelimited
 
 # Import all important PyCascading modules so we don't have to in the scripts
+from pycascading.pipe import MetaChain
 from pycascading.decorators import *
 from pycascading.tap import *
 from pycascading.operators import *

@@ -164,7 +164,10 @@ class _Stackable(object):
             result.add_context(s.context)
         return result
 
-
+class MetaChain:
+    def proxy(self, proxy):
+        raise Exception("Proxy must be defined in a meta chain class.")
+        
 class Chainable(_Stackable):
 
     """An object that can be chained with '|' operations."""
@@ -192,6 +195,8 @@ class Chainable(_Stackable):
 
     def __or__(self, other):
         result = Chainable()
+        if isinstance(other, MetaChain):
+            return other.proxy(self)
         if isinstance(other, cascading.operation.Aggregator):
             import every
             other = every.Every(aggregator=other)
