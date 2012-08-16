@@ -212,8 +212,7 @@ if [ -e sources.tgz ]; then
     echo "   \$deploy_dir/run.sh [parameters]"
 fi
 if [ \$1 == 'do_run' ]; then
-    echo \$2
-    echo \$3
+    echo "Running : \$deploy_dir/run.sh \$2"
     \$deploy_dir/run.sh \$2
 fi
 EOF
@@ -227,7 +226,7 @@ cat >"$tmp_dir/run.sh" <<EOF
 # Run the PyCascading job
 job_dir=\$(dirname "\$0")
 pycascading_dir="$server_build_dir"
-#cd "\$(dirname "\$0")/job"
+cd "\$(dirname "\$0")/job"
 hadoop $hadoop_options jar "\$pycascading_dir/pycascading.jar" \\
 "\$pycascading_dir/bootstrap.py" hadoop "\$pycascading_dir" \\
 -a "\$pycascading_dir/pycascading.tgz" -a "\$job_dir/sources.tgz" \\
