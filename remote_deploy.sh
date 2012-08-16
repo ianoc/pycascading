@@ -223,6 +223,8 @@ chmod +x "$tmp_dir/setup.sh"
 #
 main_file=$(remove_leading_slash "$main_file")
 cat >"$tmp_dir/run.sh" <<EOF
+#Allow the usage of a REMOTE_USER env var
+export REMOTE_USER=$USER
 # Run the PyCascading job
 job_dir=\$(dirname "\$0")
 pycascading_dir="$server_build_dir"
