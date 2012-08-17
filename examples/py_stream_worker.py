@@ -1,4 +1,5 @@
-def go(input):
-    words = input.split()
-    for word in words:
-        yield [word, 1]
+def go(tuple):
+    for entry in tuple:
+        words = str(entry).split()
+        for word in words:
+            yield [word, 1]

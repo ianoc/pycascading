@@ -26,6 +26,6 @@ def main():
     input = flow.source(Hfs(TextLine(), sys.argv[1]))
     output = flow.tsv_sink(sys.argv[2])
 
-    input | py_stream_replace("line", "py_stream_worker.go", libs = ['nltk'], output_fields=["word", "extrachar"] )  | group_by('word', 'extrachar', native.sum("word_count")) | output
+    input | py_stream_replace("line", PyMod("py_stream_worker.go"), ["word", "extrachar"] , libs = ['nltk'] ) | group_by('word', 'extrachar', native.sum("word_count")) | output
     
     flow.run()
