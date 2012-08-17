@@ -25,4 +25,4 @@ add2classpath "$cascading_libs" "$cascading"
 hadoop_libs='hadoop-*core*.jar lib/*.jar'
 add2classpath "$hadoop_libs" "$hadoop"
 
-export JYTHONPATH=$JYTHONPATH:"$home_dir/python"
+export JYTHONPATH=$JYTHONPATH:"$home_dir/python":.
