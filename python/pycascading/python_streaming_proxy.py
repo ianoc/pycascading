@@ -51,12 +51,26 @@ module_str,function_str = full_path_to_function_module(args.function)
 user_module = __import__(module_str)
 user_function = getattr(user_module, function_str)
 
+base_fields = None
+class Tuple(object):
+    def __init__(self, args):
+        self.__args = args
+    def get(indx):
+        return self.__args[indx]
+    def size(self):
+        return len(self.__args)
+    def __len__(self):
+        return len(self.__args)
+    def __iter__(self):
+        return self.__args.__iter__()
+
 # input comes from STDIN (standard input)
 line = sys.stdin.readline()
 while len(line) > 0:
     # remove leading and trailing whitespace
     line = line.strip()
-    for result in user_function(line):
+    tuple = Tuple(json.loads(line))
+    for result in user_function(tuple):
         res = json.dumps(result) 
         print(res)
     print '' # Seperator so parent knows we moved onto next tuple

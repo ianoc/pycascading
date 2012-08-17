@@ -57,9 +57,10 @@ __author__ = 'Gabor Szabo'
 
 import inspect
 
-from pycascading.pipe import DecoratedFunction
+from pycascading.pipe import DecoratedFunction, MetaChain
 from com.twitter.pycascading import CascadingBaseOperationWrapper
 from com.twitter.pycascading import CascadingRecordProducerWrapper
+
 
 
 def _function_decorator(args, kwargs, defaults={}):
@@ -264,3 +265,22 @@ def unwrap(*args, **kwargs):
 
 def tuplein(*args, **kwargs):
     return _function_decorator(args, kwargs, { 'parameters' : 'tuple' })
+
+
+class _Composable(MetaChain):
+   def __init__ (self, func):
+      self.func = func
+      for name in set(dir(func)) - set(dir(self)):
+        setattr(self, name, getattr(func, name))
+
+   def __call__ (self, *args, **kwargs):
+      self.__args = args
+      self.__kwargs = kwargs
+      return self
+
+   def proxy(self, *args):
+      self.__args = (args) + self.__args
+      return self.func (*self.__args, **self.__kwargs)
+    
+def composable(func):
+    return _Composable(func)

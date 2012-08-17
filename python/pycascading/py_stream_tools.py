@@ -3,44 +3,81 @@ import os, string
 from com.xhaus.jyson import JysonCodec as json
 
  
+class PyMod(object):
+    def __init__(self, modName):
+        self.modName = modName
 
-class StreamTask(MetaChain):
-    def __init__(self, replace_which, function, libs = [], output_fields = None, op = stream_replace):
-        self.__replace_which = replace_which
-        self.__function = function
-        self.__libs = libs
-        self.__output_fields = output_fields
-        self.__op = op
-
-    def proxy(self, parent):
-        output_fields = self.__output_fields
-        if self.__output_fields is None:
-            @udf_map(produces=["stream_out"])
-            def current_proxy_parser(tuple):
-                input_str = tuple.get("stream_output")
-                yield [input_str]
+@composable
+def py_stream_task(*args, **kwargs):
+    if "libs" in kwargs:
+        libs = kwargs["libs"]
+    else:
+        libs = []
+    op = kwargs["op"]
+    """Maps the given input fields to output fields."""
+    input_selector = None
+    target_module = None
+    output_fields = None
+    if len(args) == 2:
+       (input_selector, target_module, output_fields) = \
+       (Fields.ALL, args[1], None)
+    elif len(args) == 3:
+        if isinstance(args[2], PyMod):
+            # parent, [input fields], [PyMod]
+            (input_selector, target_module, output_fields) = (args[1], args[2], None)
         else:
-            @udf_map(produces=["my out"])
-            def current_proxy_parser(tuple):
-                input_str = tuple.get("stream_output")
-                yield json.loads(input_str)
-            current_proxy_parser = current_proxy_parser()
-            current_proxy_parser.decorators["produces"] = self.__output_fields
-     
-        @udf_map(produces="stream_in")
-        def toStream(tuple):
-            yield[json.dumps(list(tuple))]
+            # parent, [PyMod], Output Fields
+            (input_selector, target_module, output_fields) = (Fields.ALL, args[1], args[2])
+    elif len(args) == 4:
+        (input_selector, target_module, output_fields) = (args[1], args[2], args[3])
+    else:
+       raise Exception('py_stream* needs to be called with 1 to 3 parameters')
+    
+    if not isinstance(target_module, PyMod):
+        raise Exception("Function Modules should be wrapped in PyMod")
+    
+    function = target_module.modName
+    
+    parent = args[0]
+    
+    if output_fields is not None and isinstance(output_fields, str):
+        output_fields = [output_fields]
+
+    @udf_map
+    def current_proxy_parser(tuple):
+        input_str = tuple.get("stream_output")
+        yield json.loads(input_str)
+
+    if(output_fields is not None):
+        current_proxy_parser = current_proxy_parser()
+        current_proxy_parser.decorators["produces"] = output_fields
+ 
+    @udf_map(produces="stream_in")
+    def toStream(tuple):
+        res = []
+        for i in range(tuple.size()):
+            res.append(tuple.get(i))
+        yield[json.dumps(res)]
 
 
-        if not isinstance(self.__libs, list):
-            raise Exception("Libs must be a list")
-        user_libs = string.join(self.__libs, " ")
-        
-        if not isinstance(self.__function, str):
-            raise Exception("The function must be a fully qualified function name") 
+    if not isinstance(libs, list):
+        raise Exception("Libs must be a list")
+    user_libs = string.join(libs, " ")
+    
+    if not isinstance(function, str):
+        raise Exception("The function must be a fully qualified function name") 
 
-        return parent | self.__op(self.__replace_which, ["python", "-u", "${pycascading.root}/python/pycascading/python_streaming_proxy.py", self.__function, user_libs ], skipOffset = True ) | map_replace("stream_output", current_proxy_parser)
+    if op == "to":
+        op = map_to
+    elif op == "replace":
+        op = map_replace
+    elif op == "add":
+        op = map_add
+    return  parent | op(input_selector, toStream) | \
+            stream_replace("stream_in", ["python", "-u", "${pycascading.root}/python/pycascading/python_streaming_proxy.py", function, user_libs ], skipOffset = True ) |\
+            map_replace("stream_output", current_proxy_parser)
 
+    
 def py_stream_replace(*args, **kwargs):
-    kwargs["op"] = stream_replace
-    return StreamTask(*args, **kwargs)
+    kwargs["op"] = "replace"
+    return py_stream_task(*args, **kwargs)
