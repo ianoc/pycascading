@@ -26,7 +26,6 @@ __author__ = 'Gabor Szabo'
 
 import sys
 
-
 def setup_paths(module_paths):
     """Set up sys.path on the mappers and reducers.
 
@@ -46,7 +45,9 @@ def setup_paths(module_paths):
 
     cascading_jar = Util.getCascadingJar()
     jython_dir = module_paths[0]
-
+    source_dir = module_paths[1]
+    
+    
     sys.path.extend(cascading_jar)
     sys.path.extend((jython_dir + '/python',
                      jython_dir + '/python/Lib'))
@@ -61,3 +62,8 @@ def setup_paths(module_paths):
     # Maybe it's automatically imported in the beginning of a Jython program,
     # but since at that point the sys.path is not set yet to Lib, it will fail?
     #import encodings
+
+    # Place the cwd for jython with the source to make loading of files easier
+    # Any native java calls will of course not respect this
+    import os
+    os.chdir(source_dir)
