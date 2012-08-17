@@ -62,7 +62,10 @@ def py_stream_task(*args, **kwargs):
 
     if not isinstance(libs, list):
         raise Exception("Libs must be a list")
-    user_libs = string.join(libs, " ")
+    if len(libs) > 0:
+        user_libs = string.join(libs, " ")
+    else:
+        user_libs = None
     
     if not isinstance(function, str):
         raise Exception("The function must be a fully qualified function name") 
@@ -73,11 +76,23 @@ def py_stream_task(*args, **kwargs):
         op = map_replace
     elif op == "add":
         op = map_add
+    cmd_line = ["python", "-u", "${pycascading.root}/python/pycascading/python_streaming_proxy.py", function]
+    if user_libs is not None:
+        cmd_line.append(user_Libs)
+        
     return  parent | op(input_selector, toStream) | \
-            stream_replace("stream_in", ["python", "-u", "${pycascading.root}/python/pycascading/python_streaming_proxy.py", function, user_libs ], skipOffset = True ) |\
+            stream_replace("stream_in", cmd_line, skipOffset = True ) |\
             map_replace("stream_output", current_proxy_parser)
 
     
 def py_stream_replace(*args, **kwargs):
     kwargs["op"] = "replace"
+    return py_stream_task(*args, **kwargs)
+
+def py_stream_to(*args, **kwargs):
+    kwargs["op"] = "to"
+    return py_stream_task(*args, **kwargs)
+
+def py_stream_add(*args, **kwargs):
+    kwargs["op"] = "add"
     return py_stream_task(*args, **kwargs)
