@@ -57,7 +57,7 @@ def py_stream_task(*args, **kwargs):
         res = []
         for i in range(tuple.size()):
             res.append(tuple.get(i))
-        yield[json.dumps(res)]
+        yield [json.dumps(res)]
 
 
     if not isinstance(libs, list):
@@ -78,8 +78,8 @@ def py_stream_task(*args, **kwargs):
         op = map_add
     cmd_line = ["python", "-u", "${pycascading.root}/python/pycascading/python_streaming_proxy.py", function]
     if user_libs is not None:
-        cmd_line.append(user_Libs)
-        
+        cmd_line.append(user_libs)
+
     return  parent | op(input_selector, toStream) | \
             stream_replace("stream_in", cmd_line, skipOffset = True ) |\
             map_replace("stream_output", current_proxy_parser)
