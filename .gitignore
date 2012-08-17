@@ -4,6 +4,7 @@ build/*
 *.jar
 *.pyc
 *~
+*.swp
 examples/pycascading_data/out*/
 examples/pycascading_data/maps/
 examples/pycascading.cache/
