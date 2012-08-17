@@ -51,8 +51,8 @@ public class CascadingStreamFunctionWrapper extends CascadingBaseStreamingOperat
     super(numArgs);
   }
 
-  public CascadingStreamFunctionWrapper(int numArgs, Fields fieldDeclaration) {
-    super(numArgs, fieldDeclaration);
+  public CascadingStreamFunctionWrapper(int numArgs, Fields fieldDeclaration, boolean skipOffset) {
+    super(numArgs, fieldDeclaration, skipOffset);
   }
 
   

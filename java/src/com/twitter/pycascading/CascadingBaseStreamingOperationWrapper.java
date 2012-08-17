@@ -40,7 +40,8 @@ import cascading.operation.OperationCall;
 import cascading.tuple.Fields;
 import cascading.tuple.TupleEntry;
 
-
+import java.util.Map;
+import java.util.HashMap;
 import java.io.File;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -55,6 +56,8 @@ import java.util.ArrayList;
 import cascading.tuple.TupleEntryCollector;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 /**
@@ -103,7 +106,7 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
 
   public CascadingBaseStreamingOperationWrapper(Fields fieldDeclaration, boolean skipOffset) {
     super(fieldDeclaration);
-    this.skipOffset = true;
+    this.skipOffset = skipOffset;
     assert(fieldDeclaration.size() == 1);
   }
   
@@ -118,11 +121,37 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
   
   public CascadingBaseStreamingOperationWrapper(int numArgs, Fields fieldDeclaration, boolean skipOffset) {
     super(numArgs, fieldDeclaration);
-    this.skipOffset = true;
+    this.skipOffset = skipOffset;
     assert(fieldDeclaration.size() == 1);
   }
 
+
+  private static String[] expandCommandLine(String[] cmdLineArgs, Map<String, String> lookupTable) {
+    String[] result = new String[cmdLineArgs.length];
+    for(int i=0;i<cmdLineArgs.length; i++) {
+      String current = cmdLineArgs[i];
+      final Pattern vars = Pattern.compile("[$]\\{(\\S+)\\}");
+      final Matcher m = vars.matcher(current);
   
+      final StringBuffer sb = new StringBuffer(current.length());
+      int lastMatchEnd = 0;
+      while (m.find()) {
+        sb.append(current.substring(lastMatchEnd, m.start()));
+        final String key = m.group(1);
+        final String val = lookupTable.get(key);
+        if (val == null) {
+          sb.append(current.substring(m.start(), m.end()));
+        }
+        else {
+          sb.append(val);
+        }
+        lastMatchEnd = m.end();
+      }
+      sb.append(current.substring(lastMatchEnd));
+      result[i] = sb.toString();
+    }
+    return result;
+  }
   /**
    * The init steps on each node, here we need to start the subprocess
    * and hook up the pipes so we can communicate with it
@@ -132,20 +161,23 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
   public void prepare(FlowProcess flowProcess, OperationCall operationCall) {
     JobConf jobConf = ((HadoopFlowProcess) flowProcess).getJobConf();
     
-    
+    Map<String, String> lookupTable = new HashMap<String, String>();
     String sourceDir = null;
     if ("hadoop".equals(jobConf.get("pycascading.running_mode"))) {
       try {
         Path[] archives = DistributedCache.getLocalCacheArchives(jobConf);
         sourceDir = archives[1].toString() + "/";
+        lookupTable.put("pycascading.root", sourceDir);
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
-    } 
+    } else {
+      lookupTable.put("pycascading.root", System.getProperty("pycascading.root"));
+    }
     
-    
+
     try {
-      ProcessBuilder builder = new ProcessBuilder(this.commandLine);
+      ProcessBuilder builder = new ProcessBuilder(expandCommandLine(this.commandLine, lookupTable));
       builder.redirectErrorStream(true);
       if(sourceDir != null) {
         builder.directory(new File(sourceDir));
@@ -161,10 +193,30 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
     childProcessOutputQueue = new ArrayBlockingQueue<ArrayList<Tuple>>(10);
     readerThread = new ChildOutputReader(stdinStream, childProcessOutputQueue, this.recordSeperator, this.skipOffset);
     readerThread.start();
+    testProcessRunningOrDie();
   }
 
+  private void testProcessRunningOrDie() {
+    if ( !isProcessRunning(this.childProcess) ) {
+        try {
+          readerThread.join();
+        } catch (InterruptedException e) {}
+        String output = readerThread.dumpOutput();
+        System.err.println(output);
+        throw new RuntimeException(output);
+    }
+  }
   public int getNumParameters() {
     return 0;
+  }
+
+  private boolean isProcessRunning(Process process) {
+    try {
+      process.exitValue();
+      return false;
+    } catch (IllegalThreadStateException ex) {
+      return true;
+    }
   }
 
 
@@ -175,6 +227,7 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
    */
   public void callFunction(String currentLine) {
     try {
+      testProcessRunningOrDie();
       stdoutStream.write(currentLine.getBytes("UTF-8"));
       stdoutStream.write('\n');
       stdoutStream.flush();
@@ -192,8 +245,10 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
    */
   public void flushOutput(TupleEntryCollector outputCollector) {
     try {
+      testProcessRunningOrDie();
       ArrayList<Tuple> current = childProcessOutputQueue.poll(2, TimeUnit.MINUTES);
       if(current == null) {
+        testProcessRunningOrDie();
         throw new RuntimeException("Timed out waiting for subprocess");
       }
       for (Tuple t : current) {
@@ -256,7 +311,7 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
     private BlockingQueue<ArrayList<Tuple>> outCollector;
     private String recordSeperators;
     private boolean skipOffset;
-    
+    private ArrayList<Tuple> current_results_set = null;
     ChildOutputReader(BufferedReader outReader, BlockingQueue<ArrayList<Tuple>> outCollector) {
         this(outReader, outCollector, "\n", false);
     }
@@ -267,9 +322,32 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
       this.recordSeperators = recordSeperator;
       this.skipOffset = skipOffset;
     }
+    
+    public String dumpOutput() {
+        StringBuilder output = new StringBuilder();
+        ArrayList<Tuple> dispatched_tuple = null;
+        while((dispatched_tuple = outCollector.poll()) != null) {
+          for (Tuple t : dispatched_tuple) {
+            if(t.size() == 1) {
+              output.append(t.get(0).toString()); 
+            } else {
+              output.append(t.get(1).toString());
+            }
+            output.append("\n"); 
+          }
+        }
+        for (Tuple t : current_results_set) {
+          if(t.size() == 1) {
+            output.append(t.get(0).toString()); 
+          } else {
+            output.append(t.get(1).toString());
+          }
+          output.append("\n"); 
+        }
+        return output.toString();
+    }
 
     public void run() {
-      ArrayList<Tuple> current_results_set = null;
       try {
         char[] inputChar = new char[1];
         int current_head_indx = 0;
