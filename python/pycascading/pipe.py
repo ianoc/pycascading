@@ -164,7 +164,7 @@ class _Stackable(object):
             result.add_context(s.context)
         return result
 
-class MetaChain:
+class MetaChain(object):
     def proxy(self, proxy):
         raise Exception("Proxy must be defined in a meta chain class.")
         
