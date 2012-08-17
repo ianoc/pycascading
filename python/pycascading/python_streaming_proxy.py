@@ -55,7 +55,7 @@ base_fields = None
 class Tuple(object):
     def __init__(self, args):
         self.__args = args
-    def get(indx):
+    def get(self,indx):
         return self.__args[indx]
     def size(self):
         return len(self.__args)
