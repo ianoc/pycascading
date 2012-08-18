@@ -34,9 +34,15 @@ public class PythonObjectInputStream extends ObjectInputStream {
       String functionType = (String) serializedFunction.get(0);
       String module = (String)serializedFunction.get(1);
       String functionName = (String) serializedFunction.get(3);
+      String fullFunctionPath = null;
+      if(module != null && module.length() > 0){
+        fullFunctionPath = module + "." + functionName;
+      } else {
+        fullFunctionPath = functionName;
+      }
       PyObject function = null;
       if ("global".equals(functionType)) {
-        function = interpreter.eval(module + "." + functionName);
+        function = interpreter.eval(fullFunctionPath);
       } else if ("closure".equals(functionType)) {
         interpreter.exec((String) serializedFunction.get(4));
         function = interpreter.get(functionName);
