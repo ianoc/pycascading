@@ -3,19 +3,58 @@
 import sys
 import site
 import string
-import os,pprint
+import os
+import tempfile
+import os.path
+import time
+
+
+stdin = sys.stdin
+stdout = sys.stdout
+sys.stdin = None
+sys.stdout = sys.stderr
+
 
 JYTHON_PATH = os.environ["JYTHONPATH"]
 for p in JYTHON_PATH.split(":"):
     if not p.endswith("jar"):
         sys.path.extend(p)
 
+import new
+lockModule = new.module("LockFile")
+sys.modules["LockFile"] = lockModule
+class LockFile(object):
+    def __init__(self, lock_file):
+        self.__lockfile = lock_file
+    def __enter__(self):
+        self.__file = tempfile.NamedTemporaryFile("wb")
+        self.__name = self.__file.name
+        for attempt_number in range(70): # loop aroud a few times
+            try:
+                os.link(self.__name, self.__lockfile )
+                return self
+            except OSError as e:
+                if time.time() - os.path.getmtime(self.__lockfile) > 600: # No one can lock for more than 10mins
+                    try:
+                        os.unlink(self.__lockfile)
+                    except e:
+                        pass
+                else:
+                    time.sleep(10)
+        raise Exception("Locking failed")
+    def __exit__(self, type, value, tb):
+        self.__file.close()
+        os.unlink(self.__lockfile)
+
+lockModule.LockFile = LockFile
+
 def install_with_easy_install(packages):
-    import subprocess
-    subprocess.check_call(["sudo", "easy_install-2.6", "-U", "distribute"])
-    for pkg in packages: 
-        subprocess.check_call(["sudo", "easy_install-2.6", pkg])
-        reload(site) # Reload often incase more downstream needs it
+    with LockFile("/tmp/easy_install_ops3.lock"):
+        import subprocess
+        subprocess.check_call("sudo easy_install-2.6 -U distribute", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        for pkg in packages:
+            subprocess.check_call("sudo easy_install-2.6 -U %s" % (pkg), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            reload(site) # Reload often incase more downstream needs it
 
 try:
     import argparse
@@ -25,11 +64,7 @@ except ImportError, e:
     import argparse
     import simplejson as json
 
-stdin = sys.stdin
-stdout = sys.stdout
-sys.stdin = None
-sys.stdout = open('/tmp/stdout.txt', 'w')
-sys.stderr = open('/tmp/stderr.txt', 'w')
+
 
 
 parser = argparse.ArgumentParser(description='Handles dependency fetching and setting up of the python env, handling the streaming portion of the op')

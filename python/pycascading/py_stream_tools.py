@@ -1,6 +1,6 @@
 from pycascading.helpers import *
 import os, string
-from com.xhaus.jyson import JysonCodec as json
+from com.xhaus.jyson import JysonCodec
 
  
 class PyMod(object):
@@ -46,7 +46,7 @@ def py_stream_task(*args, **kwargs):
     @udf_map
     def current_proxy_parser(tuple):
         input_str = tuple.get("stream_output")
-        yield json.loads(input_str)
+        yield JysonCodec.loads(input_str)
 
     if(output_fields is not None):
         current_proxy_parser = current_proxy_parser()
@@ -57,7 +57,7 @@ def py_stream_task(*args, **kwargs):
         res = []
         for i in range(tuple.size()):
             res.append(tuple.get(i))
-        yield [json.dumps(res)]
+        yield [JysonCodec.dumps(res)]
 
 
     if not isinstance(libs, list):

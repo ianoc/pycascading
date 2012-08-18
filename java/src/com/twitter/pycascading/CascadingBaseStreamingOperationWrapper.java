@@ -163,22 +163,38 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
     
     Map<String, String> lookupTable = new HashMap<String, String>();
     String sourceDir = null;
+    String pycascadingDir = null;
+    String[] modulePaths = null;
+    String jythonPath = null;
     if ("hadoop".equals(jobConf.get("pycascading.running_mode"))) {
       try {
         Path[] archives = DistributedCache.getLocalCacheArchives(jobConf);
+        pycascadingDir = archives[0].toString() + "/";
         sourceDir = archives[1].toString() + "/";
-        lookupTable.put("pycascading.root", sourceDir);
+        modulePaths = new String[archives.length];
+        int i = 0;
+        StringBuilder jythonPathBuilder = new StringBuilder();
+        for (Path archive : archives) {
+          modulePaths[i++] = archive.toString();
+          jythonPathBuilder.append(modulePaths[i-1]);
+          jythonPathBuilder.append(":");
+        }
+        jythonPath = jythonPathBuilder.toString();
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
     } else {
-      lookupTable.put("pycascading.root", System.getProperty("pycascading.root"));
+        pycascadingDir = System.getProperty("pycascading.root") + "/";
+        modulePaths = new String[] { pycascadingDir, sourceDir };
+        jythonPath = pycascadingDir + ":" + sourceDir + ":" + System.getenv().get("JYTHONPATH");
     }
-    
+    lookupTable.put("pycascading.root", pycascadingDir);
 
     try {
       ProcessBuilder builder = new ProcessBuilder(expandCommandLine(this.commandLine, lookupTable));
-      builder.redirectErrorStream(true);
+      Map<String, String> env = builder.environment();
+      env.put("JYTHONPATH", jythonPath);
+      
       if(sourceDir != null) {
         builder.directory(new File(sourceDir));
       }
@@ -189,7 +205,15 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
     this.stdoutStream = new DataOutputStream(new BufferedOutputStream(
                                                        childProcess.getOutputStream(),
                                                        BUFFER_SIZE));
+
+    
     this.stdinStream = new BufferedReader(new InputStreamReader(childProcess.getInputStream()));
+    
+    BufferedReader stderr = new BufferedReader(new InputStreamReader(childProcess.getErrorStream()));
+    
+    StderrReader stderrThread = new StderrReader(stderr);
+    stderrThread.start();
+    
     childProcessOutputQueue = new ArrayBlockingQueue<ArrayList<Tuple>>(10);
     readerThread = new ChildOutputReader(stdinStream, childProcessOutputQueue, this.recordSeperator, this.skipOffset);
     readerThread.start();
@@ -246,7 +270,7 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
   public void flushOutput(TupleEntryCollector outputCollector) {
     try {
       testProcessRunningOrDie();
-      ArrayList<Tuple> current = childProcessOutputQueue.poll(2, TimeUnit.MINUTES);
+      ArrayList<Tuple> current = childProcessOutputQueue.poll(15, TimeUnit.MINUTES);
       if(current == null) {
         testProcessRunningOrDie();
         throw new RuntimeException("Timed out waiting for subprocess");
@@ -381,7 +405,27 @@ public class CascadingBaseStreamingOperationWrapper extends BaseOperation implem
         }
       }
     }
+  }
 
+    
+  class StderrReader extends Thread {
+    private BufferedReader outReader;
+
+    StderrReader(BufferedReader outReader) {
+      setDaemon(true);
+      this.outReader = outReader;
+    }
+    
+    public void run() {
+      try {
+       
+       String nextLine = null;
+       while((nextLine = outReader.readLine()) != null) {
+        System.err.println(nextLine);
+       }
+      } catch (IOException ex) {
+      }
+    }
   }
 
 
