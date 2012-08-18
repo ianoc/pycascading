@@ -29,6 +29,7 @@ from cascading.tuple import Fields
 from cascading.operation import Identity
 import cascading.pipe.assembly.Rename
 import cascading.pipe.assembly.Discard
+import cascading.operation.expression.ExpressionFilter
 from pycascading.pipe import SubAssembly, coerce_to_fields
 from pycascading.each import Apply
 
@@ -48,6 +49,41 @@ def retain(*fields_to_keep):
 def discard(fields_to_discard):
     return SubAssembly(cascading.pipe.assembly.Discard,\
                        coerce_to_fields(fields_to_discard))
+ 
+def expression_filter(*args):
+    fields_for_expression, expression_str, types = (None, None, None)
+    if len(args) == 2:
+        expression_str = args[0]
+        types = args[1]
+    elif len(args) == 3:
+        fields_for_expression = args[0]
+        expression_str = args[1]
+        types = args[2]
+        if not isinstance(types, list):
+            types = [types]
+
+    if fields_for_expression is not None:
+        if isinstance(fields_for_expression, str):
+            fields_for_expression = [fields_for_expression]
+    if fields_for_expression is not None:
+        return cascading.operation.expression.ExpressionFilter(expression_str, fields_for_expression, types)
+    else:
+        return cascading.operation.expression.ExpressionFilter(expression_str, types)
+
+import java.lang.Object
+baseClass = java.lang.Object()
+
+def l_exp_filter(expression):
+    import java.lang.Long
+    return expression_filter(expression, java.lang.Long.TYPE)
+
+def str_exp_filter(expression):
+    baseClass = java.lang.String()
+    return expression_filter(expression, baseClass.class)
+
+def f_exp_filter(expression):
+    import java.lang.Float
+    return expression_filter(expression, java.lang.Float.TYPE)
 
 def rename(*args):
     """Rename the fields to new names.
