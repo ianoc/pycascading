@@ -32,10 +32,11 @@ public class PythonObjectInputStream extends ObjectInputStream {
     if (obj instanceof SerializedPythonFunction) {
       PyTuple serializedFunction = ((SerializedPythonFunction) obj).getSerializedFunction();
       String functionType = (String) serializedFunction.get(0);
+      String module = (String)serializedFunction.get(1);
       String functionName = (String) serializedFunction.get(3);
       PyObject function = null;
       if ("global".equals(functionType)) {
-        function = interpreter.get(functionName);
+        function = interpreter.eval(module + "." + functionName);
       } else if ("closure".equals(functionType)) {
         interpreter.exec((String) serializedFunction.get(4));
         function = interpreter.get(functionName);
