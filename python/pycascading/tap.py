@@ -138,7 +138,12 @@ class Flow(object):
         return self.sink(cascading.tap.hadoop.Hfs(sink_scheme, output_path,
                                            cascading.tap.SinkMode.REPLACE))
 
-    def tsv_sink(self, output_path, fields=Fields.ALL):
+    def basic_sink(self, cascading_scheme, output_path):
+        output_path = expand_path_with_home(output_path)
+        return self.sink(cascading.tap.hadoop.Hfs(cascading_scheme, output_path,
+                                           cascading.tap.SinkMode.REPLACE))
+
+    def tsv_sink(self, output_path, fields=Fields.ALL, meta_sink = True):
         # TODO: in local mode, do not prepend the home folder to the path
         """A sink to store the tuples as tab-separated values in text files.
 
@@ -147,8 +152,12 @@ class Flow(object):
         fields -- the fields to store. Defaults to all fields.
         """
         output_path = expand_path_with_home(output_path)
-        return self.meta_sink(cascading.scheme.hadoop.TextDelimited(fields, '\t'),
-                              output_path)
+        if meta_sink:
+            return self.meta_sink(cascading.scheme.hadoop.TextDelimited(fields, '\t'),
+                                  output_path)
+        else:
+            return self.basic_sink(cascading.scheme.hadoop.TextDelimited(fields, True, '\t'),
+                                  output_path)
 
     def binary_sink(self, output_path, fields=Fields.ALL):
         """A sink to store binary sequence files to store the output.

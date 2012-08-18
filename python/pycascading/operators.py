@@ -28,7 +28,7 @@ import itertools
 from cascading.tuple import Fields
 from cascading.operation import Identity
 import cascading.pipe.assembly.Rename
-
+import cascading.pipe.assembly.Discard
 from pycascading.pipe import SubAssembly, coerce_to_fields
 from pycascading.each import Apply
 
@@ -45,11 +45,9 @@ def retain(*fields_to_keep):
     return Apply(fields_to_keep, Identity(Fields.ARGS), Fields.RESULTS)
 
 
-def _discard(fields_to_discard):
-    # In 2.0 there's a builtin function this, Discard
-    # In 1.2 there is nothing for this
-    raise Exception('Discard only works with Cascading 2.0')
-
+def discard(fields_to_discard):
+    return SubAssembly(cascading.pipe.assembly.Discard,\
+                       coerce_to_fields(fields_to_discard))
 
 def rename(*args):
     """Rename the fields to new names.
