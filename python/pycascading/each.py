@@ -30,6 +30,9 @@ import inspect
 import cascading.pipe
 from cascading.tuple import Fields
 from com.twitter.pycascading import CascadingStreamFunctionWrapper
+
+import com.twitter.pycascading.expression.ExpressionFilter
+import com.twitter.pycascading.expression.ExpressionFunction
 from com.twitter.pycascading import CascadingFunctionWrapper, \
 CascadingFilterWrapper
 
@@ -90,6 +93,46 @@ class _Each(Operation):
         # different for Cascading.
         each = cascading.pipe.Each(parent.get_assembly(), *args)
         return cascading.pipe.Pipe(random_pipe_name('each'), each)
+
+
+class _StringEach(_Each):
+
+    """The equivalent of Each in Cascading.
+       
+        Seperate from the other Each as we don't have to deal with decorated functions. Though
+        since we can't encode the selected output fields into the decorator those must be passed
+        through to this function to be useful.
+    """
+
+    def __init__(self, function_type, *args):
+        """Build the Each constructor for the Python function.
+
+        Arguments:
+        function_type -- CascadingStreamFunctionWrapper
+        *args -- the arguments passed on to Cascading Each
+        """
+        Operation.__init__(self)
+
+        self._expression = None
+        self._output_selector = None
+        self._argument_selector = None
+        self._produces = None
+        
+        if(len(args) != 4):
+            raise Exception('The number of parameters to String each ' \
+                        'should be 4')
+        (self._produces, self._argument_selector, self._output_selector, self._expression) = \
+        (coerce_to_fields(args[0]), coerce_to_fields(args[1]), coerce_to_fields(args[2]), args[3])
+        if self._produces is not None:
+            self._function = function_type(self._produces, self._expression)
+        else:
+            self._function = function_type(self._expression)
+
+
+## three use cases here
+# 1) Mutate fields in place
+# 2) Add field at the end
+
 
 
 class _StreamingEach(_Each):
@@ -167,6 +210,52 @@ class Filter(_Each):
     def __init__(self, *args):
         _Each.__init__(self, CascadingFilterWrapper, *args)
 
+
+class _ExpressionFilter(_StringEach):
+    """Filter the tuple stream through the user-defined function.
+
+    The corresponding class in Cascading is Each called with a Filter.
+    """
+    def __init__(self, *args):
+        _StringEach.__init__(self, com.twitter.pycascading.expression.ExpressionFilter, *args)
+
+        
+class _ExpressionApply(_StringEach):
+    """Filter the tuple stream through the user-defined function.
+
+    The corresponding class in Cascading is Each called with a Filter.
+    """
+    def __init__(self, *args):
+        _StringEach.__init__(self, com.twitter.pycascading.expression.ExpressionFunction, *args)
+
+def py_expr(*args):
+    """ Python expression for mutating fields in the tuples being passed in
+        One argument:
+            Arg 1) string python expression
+            Behavior: Will use the python to mutate existing fields producing the same number of output fields
+            
+        Two arguments:
+            Arg 1) Select from input fields (name or array)
+            Arg 2) Expression
+            Behavior: Will use the python to mutate the fields selected by the input selector
+        
+        Three arguments:
+            Arg 1) Select from input fields (name or array)
+            Arg 2) Expression
+            Arg 3) New output field that is the result of the expression
+    """
+    
+    #  (self._produces, self._argument_selector, self.output_selector, self._expression) = (args[0], args[1], args[2], args[3])
+        #self._function = function_type(self._produces, expression)
+    if len(args) == 1:
+        return _ExpressionApply(Fields.ARGS, Fields.ALL, Fields.SWAP, args[0])
+    elif len(args) == 2:
+        return _ExpressionApply(Fields.ARGS, args[0], Fields.SWAP, args[1])
+    elif len(args) == 3:
+        return _ExpressionApply(args[2], args[0], Fields.ALL, args[1])
+    
+def py_filter(expression):
+    return _ExpressionFilter(None, Fields.ALL, None, expression)
 
 def _any_instance(var, classes):
     """Check if var is an instance of any class in classes."""
