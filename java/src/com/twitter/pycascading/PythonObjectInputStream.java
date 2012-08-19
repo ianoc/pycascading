@@ -37,6 +37,8 @@ public class PythonObjectInputStream extends ObjectInputStream {
       String fullFunctionPath = null;
       if(module != null && module.length() > 0){
         fullFunctionPath = module + "." + functionName;
+        // Incase the module isn't actually available
+        interpreter.exec("import " + module);
       } else {
         fullFunctionPath = functionName;
       }
