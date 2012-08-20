@@ -31,7 +31,9 @@ public class ExpressionFunction extends ExpressionOperation implements Function<
         if (fieldDeclaration.isArguments()) {
             PyObject context = evaluate(functionCall.getContext(), functionCall.getArguments(), true);
             Tuple result = new Tuple();
-            Fields f = functionCall.getArguments().getFields();
+            TupleEntry tupleEntry = functionCall.getArguments();
+            Fields f = tupleEntry.getFields();
+            Class[] tuple_types = tupleEntry.getTuple().getTypes();
             for (int i = 0; i < f.size(); i++) {
                 Comparable fieldDefn = f.get(i); // Get the field name or position
                 PyObject val;
@@ -41,7 +43,7 @@ public class ExpressionFunction extends ExpressionOperation implements Function<
                     String fieldName = String.format("$%d", (Integer) fieldDefn);
                     val = context.__getitem__(Py.java2py((String) fieldName));
                 }
-                result.add(val);
+                result.add(Py.tojava(val, tuple_types[i]));
             }
             functionCall.getOutputCollector().add(result);
         } else {
