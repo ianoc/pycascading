@@ -28,7 +28,7 @@ from com.twitter.pycascading import CascadingAggregatorWrapper, \
 CascadingBufferWrapper
 
 from pycascading.pipe import Operation, coerce_to_fields, wrap_function, \
-random_pipe_name, DecoratedFunction, _Stackable
+random_pipe_name, DecoratedFunction, _Stackable, Chainable
 
 from pycascading.decorators import udf
 
@@ -169,12 +169,13 @@ class GroupBy(Operation):
         return args
 
     def _create_with_parent(self, parent):
-        if isinstance(parent, _Stackable):
-            # We're chaining with a _Stackable object
-            args = self.__create_args(pipes=parent.stack, **self.__kwargs)
-        else:
+        if isinstance(parent, Chainable):
             # We're chaining with a Chainable object
             args = self.__create_args(pipe=parent, **self.__kwargs)
+        else:
+            # We're chaining with a _Stackable object
+            args = self.__create_args(pipes=parent.stack, **self.__kwargs)
+
         group_by = cascading.pipe.GroupBy(*args)
         return cascading.pipe.Pipe(random_pipe_name('group'), group_by)
 
