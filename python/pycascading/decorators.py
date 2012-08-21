@@ -266,21 +266,29 @@ def unwrap(*args, **kwargs):
 def tuplein(*args, **kwargs):
     return _function_decorator(args, kwargs, { 'parameters' : 'tuple' })
 
+class _Composed(MetaChain):
+    def __init__(self, func, *args, **kwargs):
+        self.func = func
+        self.__args = args
+        self.__kwargs = kwargs
+    
+    def proxy(self, *args):
+      self.__args = (args) + self.__args
+      return self.func (*self.__args, **self.__kwargs)
 
 class _Composable(MetaChain):
    def __init__ (self, func):
+      self.__args = ()
+      self.__kwargs = {}
       self.func = func
       for name in set(dir(func)) - set(dir(self)):
         setattr(self, name, getattr(func, name))
 
    def __call__ (self, *args, **kwargs):
-      self.__args = args
-      self.__kwargs = kwargs
-      return self
+      return _Composed(self.func, *args, **kwargs)
 
    def proxy(self, *args):
-      self.__args = (args) + self.__args
-      return self.func (*self.__args, **self.__kwargs)
+      return self.func (*args)
     
 def composable(func):
     return _Composable(func)
