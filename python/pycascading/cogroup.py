@@ -138,7 +138,7 @@ def left_outer_join(*args, **kwargs):
 
 def right_outer_join(*args, **kwargs):
     """Shortcut for a right outer join."""
-    kwargs['joiner'] = cascading.pipe.cogroup.RightJoin()
+    kwargs['joiner'] = cascading.pipe.joiner.RightJoin()
     if not 'declared_fields' in kwargs:
         kwargs['declared_fields'] = None
     return CoGroup(*args, **kwargs)
