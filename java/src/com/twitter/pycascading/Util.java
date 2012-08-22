@@ -25,10 +25,18 @@ import org.apache.hadoop.conf.Configuration;
 
 import cascading.flow.Flow;
 import cascading.flow.FlowConnector;
+import cascading.flow.FlowElement;
 import cascading.flow.hadoop.HadoopFlowConnector;
 import cascading.flow.FlowListener;
+import cascading.flow.FlowStep;
+import cascading.flow.FlowStepStrategy;
+import cascading.flow.planner.BaseFlowStep;
+import cascading.pipe.Group;
 import cascading.pipe.Pipe;
 import cascading.tap.Tap;
+import java.util.Set;
+import org.apache.hadoop.mapred.JobConf;
+import org.jgrapht.graph.SimpleDirectedGraph;
 
 /**
  * Helper class that sets up the MR environment and runs a Cascading Flow.
@@ -36,6 +44,23 @@ import cascading.tap.Tap;
  * @author Gabor Szabo
  */
 public class Util {
+    static class RenameFlowStepStrategy implements FlowStepStrategy {
+
+        public RenameFlowStepStrategy() {
+        }
+
+        public void apply(Flow flow, List list, FlowStep fs) {
+            BaseFlowStep baseFlowStep = (BaseFlowStep) fs;
+            Set<FlowElement> vertices = baseFlowStep.getGraph().vertexSet();
+            JobConf flow_config = (JobConf) fs.getConfig();
+
+            for (FlowElement vertex : vertices) {
+                if (vertex instanceof Pipe) {
+                    flow_config.setJobName(((Pipe) vertex).getName());
+                }
+            }
+        }
+    }
   // http://www.velocityreviews.com/forums/t147526-how-to-get-jar-file-name.html
   /**
    * Get the temporary folder where the job jar was extracted to by Hadoop.
@@ -153,8 +178,11 @@ public class Util {
     }
 
     FlowConnector.setApplicationJarClass(properties, Main.class);
+    
     FlowConnector flowConnector = new HadoopFlowConnector(properties);
     Flow flow = flowConnector.connect(sources, sinks, tails);
+    flow.setFlowStepStrategy(new RenameFlowStepStrategy());
+
     if ("hadoop".equals(runningMode)) {
       try {
         flow.addListener(tempDir);
