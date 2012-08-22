@@ -59,7 +59,10 @@ class CoGroup(Operation):
                       result_group_fields=None, joiner=None,
                       pipe=None, num_self_joins=None,
                       lhs=None, lhs_group_fields=None,
-                      rhs=None, rhs_group_fields=None):
+                      rhs=None, rhs_group_fields=None,name=None):
+        if name is not None and group_name is None:
+            group_name = name
+        
         # We can use an unnamed parameter only for group_fields
         if self.__args:
             group_fields = [coerce_to_fields(f) for f in self.__args[0]]

@@ -50,13 +50,14 @@ class _Each(Operation):
     functionality.
     """
 
-    def __init__(self, function_type, *args):
+    def __init__(self, function_type, *args, **kwargs):
         """Build the Each constructor for the Python function.
 
         Arguments:
         function_type -- CascadingFunctionWrapper or CascadingFilterWrapper,
             whether we are calling Each with a function or filter
         *args -- the arguments passed on to Cascading Each
+        **kwargs -- used to pass along the name for this operator
         """
         Operation.__init__(self)
 
@@ -80,6 +81,10 @@ class _Each(Operation):
                             'should be between 1 and 3')
         # This is the Cascading Function type
         self._function = wrap_function(self._function, function_type)
+        if "name" in kwargs:
+            self._name = kwargs["name"]
+        else:
+            self._name = "each"
 
     def _create_with_parent(self, parent):
         args = []
@@ -92,7 +97,7 @@ class _Each(Operation):
         # joins may not work as the names of pipes apparently have to be
         # different for Cascading.
         each = cascading.pipe.Each(parent.get_assembly(), *args)
-        return cascading.pipe.Pipe(random_pipe_name('each'), each)
+        return cascading.pipe.Pipe(random_pipe_name(self._name), each)
 
 
 class _StringEach(_Each):
@@ -117,7 +122,7 @@ class _StringEach(_Each):
         self._output_selector = None
         self._argument_selector = None
         self._produces = None
-        
+        self._name = "ExpressionEach"
         if(len(args) != 4):
             raise Exception('The number of parameters to String each ' \
                         'should be 4')
@@ -152,7 +157,7 @@ class _StreamingEach(_Each):
         *args -- the arguments passed on to Cascading Each
         """
         Operation.__init__(self)
-
+        self._name = "StreamingEach"
         self._function = None
         # The default argument selector is Fields.ALL (per Cascading sources
         # for Operator.java)
@@ -198,8 +203,8 @@ class Apply(_Each):
 
     The corresponding class in Cascading is Each called with a Function.
     """
-    def __init__(self, *args):
-        _Each.__init__(self, CascadingFunctionWrapper, *args)
+    def __init__(self, *args, **kwargs):
+        _Each.__init__(self, CascadingFunctionWrapper, *args, **kwargs)
 
 
 class Filter(_Each):
@@ -265,7 +270,7 @@ def _any_instance(var, classes):
     return False
 
 
-def _map(output_selector, *args):
+def _map(output_selector, *args, **kwargs):
     """Maps the given input fields to output fields."""
     if len(args) == 1:
         (input_selector, function, output_field) = \
@@ -297,19 +302,19 @@ def _map(output_selector, *args):
         df = udf(produces=output_field)(function)
     else:
         df = function
-    return Apply(input_selector, df, output_selector)
+    return Apply(input_selector, df, output_selector, **kwargs)
 
 
-def map_add(*args):
+def map_add(*args, **kwargs):
     """Map the defined fields (or all fields), and add the results to the tuple.
 
     Note that the new field names we are adding to the tuple cannot overlap
     with existing field names, or Cascading will complain.
     """
-    return _map(Fields.ALL, *args)
+    return _map(Fields.ALL, *args, **kwargs)
 
 
-def map_replace(*args):
+def map_replace(*args, **kwargs):
     """Map the tuple, remove the mapped fields, and add the new fields.
 
     This mapping replaces the fields mapped with the new fields that the
@@ -326,12 +331,12 @@ def map_replace(*args):
     * Three arguments: they are interpreted as the input field selector, the
       map function, and finally the output fields' names.
     """
-    return _map(Fields.SWAP, *args)
+    return _map(Fields.SWAP, *args, **kwargs)
 
 
-def map_to(*args):
+def map_to(*args, **kwargs):
     """Map the tuple, and keep only the results returned by the function."""
-    return _map(Fields.RESULTS, *args)
+    return _map(Fields.RESULTS, *args, **kwargs)
 
 
 def filter_by(function):

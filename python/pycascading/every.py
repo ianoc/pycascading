@@ -139,11 +139,12 @@ class GroupBy(Operation):
                       pipes=None, group_fields=None, sort_fields=None,
                       reverse_order=None,
                       pipe=None,
-                      lhs_pipe=None, rhs_pipe=None):
+                      lhs_pipe=None, rhs_pipe=None, name="group"):
         # We can use an unnamed parameter only for group_fields
         if self.__args:
             group_fields = coerce_to_fields(self.__args[0])
         args = []
+        self.__name = name
         if group_name:
             args.append(group_name)
         if pipes:
@@ -177,7 +178,7 @@ class GroupBy(Operation):
             args = self.__create_args(pipes=parent.stack, **self.__kwargs)
 
         group_by = cascading.pipe.GroupBy(*args)
-        return cascading.pipe.Pipe(random_pipe_name('group'), group_by)
+        return cascading.pipe.Pipe(random_pipe_name(self.__name), group_by)
 
 
 class _DelayedInitialization(Operation):

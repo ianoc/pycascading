@@ -100,8 +100,10 @@ def random_pipe_name(prefix):
         name = name + '/' + str(line) + ':' + file
     name += ' '
     id = ''
+    name += "RND("
     for i in xrange(0, 4):
         name += chr(random.randint(ord('a'), ord('z')))
+    name += ")"
     return name
 
 

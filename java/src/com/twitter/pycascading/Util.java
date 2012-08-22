@@ -56,7 +56,9 @@ public class Util {
 
             for (FlowElement vertex : vertices) {
                 if (vertex instanceof Pipe) {
-                    flow_config.setJobName(((Pipe) vertex).getName());
+                    String pipe_name = ((Pipe) vertex).getName();
+                    String job_name = flow.getName() + ":" + pipe_name.replaceAll("RND\\([A-Za-z]*\\)", "");
+                    flow_config.setJobName(job_name);
                 }
             }
         }
@@ -111,7 +113,7 @@ public class Util {
     System.setProperty("pycascading.root", root);
   }
 
-  public static void run(int numReducers, Map<String, Object> config, Map<String, Tap> sources,
+  public static void run(String name, int numReducers, Map<String, Object> config, Map<String, Tap> sources,
           Map<String, Tap> sinks, Pipe... tails) throws IOException, URISyntaxException {
     // String strClassPath = System.getProperty("java.class.path");
     // System.out.println("Classpath is " + strClassPath);
@@ -180,9 +182,8 @@ public class Util {
     FlowConnector.setApplicationJarClass(properties, Main.class);
     
     FlowConnector flowConnector = new HadoopFlowConnector(properties);
-    Flow flow = flowConnector.connect(sources, sinks, tails);
+    Flow flow = flowConnector.connect(name, sources, sinks, tails);
     flow.setFlowStepStrategy(new RenameFlowStepStrategy());
-
     if ("hadoop".equals(runningMode)) {
       try {
         flow.addListener(tempDir);
