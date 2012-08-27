@@ -148,6 +148,7 @@ class CascadingTestCase(unittest.TestCase):
             else: #It was a list, lets try give back a list
                 raw_types = open("%s/.pycascading_types" % (output_path), "rb").read().strip().split("\n")
                 types = [s.split("\t")[1].strip() for s in raw_types]
+                names = [s.split("\t")[0].strip() for s in raw_types]
                 lines = produced_output_str.split("\n")
                 output = []
                 for line in lines:
@@ -164,10 +165,12 @@ class CascadingTestCase(unittest.TestCase):
                             cur_line.append(float(segments[idx]))
                         elif types[idx] == "java.lang.Integer":
                             cur_line.append(int(segments[idx]))
+                        elif types[idx] == "java.lang.Long":
+                            cur_line.append(long(segments[idx]))
                         else:
                             raise Exception("Don't know how to handle type : " + str([types[idx]]))
                     output.append(cur_line)
-                return output
+                return (names, output)
         finally:
             shutil.rmtree(temp_directory)
     
