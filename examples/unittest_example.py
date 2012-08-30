@@ -10,6 +10,19 @@ def wrapped_case(tuple):
         if len(word) > 0:
             yield [tuple.get(0), word]
 
+
+@udf_map(produces=['doc_id', 'token'])
+def wrapped_case_extra_arg(tuple, gt_len):
+    for word in re.split("[ \\[\\]\\(\\),.]", tuple.get(1)):
+        if len(word) > gt_len:
+            yield [tuple.get(0), word]
+
+@udf_map(produces=['doc_id', 'token'])
+def wrapped_case_keyword_extra_arg(tuple, gt_len = 0):
+    for word in re.split("[ \\[\\]\\(\\),.]", tuple.get(1)):
+        if len(word) > gt_len:
+            yield [tuple.get(0), word]
+
 def unwrapped_case(tuple):
     for word in re.split("[ \\[\\]\\(\\),.]", tuple.get(1)):
         if len(word) > 0:
@@ -21,10 +34,19 @@ def produce_not_match_output(tuple):
         if len(word) > 0:
             yield [tuple.get(0), word]
 
+
 class UnitTestExample(CascadingTestCase):
     def testWrapped(self):
         results = self.run_udf([33,'arg1 arg2 arg3'], wrapped_case)
         self.assertEqual(3, len(results))
+
+    def wrapped_case_extra_arg(self):
+        results = self.run_udf([33,'arg1 arg2 arg3 longerArg'], wrapped_case_extra_arg(3))
+        self.assertEqual(1, len(results))
+
+    def wrapped_case_keyword_extra_arg(self):
+        results = self.run_udf([33,'arg1 arg2 arg3 longerArg'], wrapped_case_keyword_extra_arg(gt_len = 3))
+        self.assertEqual(1, len(results))
 
     def testUnWrapped(self):
         results = self.run_udf([33,'arg1 arg2 arg3'], unwrapped_case)
