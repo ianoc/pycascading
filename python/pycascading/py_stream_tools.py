@@ -7,6 +7,19 @@ class PyMod(object):
     def __init__(self, modName):
         self.modName = modName
 
+
+@udf_map
+def _current_proxy_parser(tuple):
+    input_str = tuple.get("stream_output")
+    yield JysonCodec.loads(input_str)
+
+@udf_map(produces="stream_in")
+def _to_stream(tuple):
+     res = []
+     for i in range(tuple.size()):
+         res.append(tuple.get(i))
+     yield [JysonCodec.dumps(res)]
+
 @composable
 def py_stream_task(*args, **kwargs):
     if "libs" in kwargs:
@@ -43,21 +56,12 @@ def py_stream_task(*args, **kwargs):
     if output_fields is not None and isinstance(output_fields, str):
         output_fields = [output_fields]
 
-    @udf_map
-    def current_proxy_parser(tuple):
-        input_str = tuple.get("stream_output")
-        yield JysonCodec.loads(input_str)
 
     if(output_fields is not None):
-        current_proxy_parser = current_proxy_parser()
+        current_proxy_parser = _current_proxy_parser()
         current_proxy_parser.decorators["produces"] = output_fields
  
-    @udf_map(produces="stream_in")
-    def toStream(tuple):
-        res = []
-        for i in range(tuple.size()):
-            res.append(tuple.get(i))
-        yield [JysonCodec.dumps(res)]
+ 
 
 
     if not isinstance(libs, list):
@@ -80,7 +84,7 @@ def py_stream_task(*args, **kwargs):
     if user_libs is not None:
         cmd_line.append(user_libs)
 
-    return  parent | op(input_selector, toStream) | \
+    return  parent | op(input_selector, _to_stream) | \
             stream_replace("stream_in", cmd_line, skipOffset = True ) |\
             map_replace("stream_output", current_proxy_parser)
 
