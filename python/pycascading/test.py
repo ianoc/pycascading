@@ -118,7 +118,7 @@ class CascadingTestCase(unittest.TestCase):
             input_filename = "%s/input_file" % (temp_directory)
             f = open(input_filename, "wb")
             if isinstance(input, str):
-                f.write(input_str)
+                f.write(input)
             elif isinstance(input, list):
                 for line in input:
                     first = True
