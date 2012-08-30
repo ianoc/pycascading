@@ -21,6 +21,22 @@ class CascadingTestCase(unittest.TestCase):
             if 'produces' in wrapped_function.decorators:
                 return wrapped_function.decorators['produces']
         return None
+    
+    def get_args(self, wrapped_function):
+        if isinstance(wrapped_function, DecoratedFunction):
+            if 'args' in wrapped_function.decorators:
+                args =  wrapped_function.decorators['args']
+                if args is not None:
+                    return args
+        return ()
+    
+    def get_kwargs(self, wrapped_function):
+        if isinstance(wrapped_function, DecoratedFunction):
+            if 'kwargs' in wrapped_function.decorators:
+                kwargs = wrapped_function.decorators['kwargs']
+                if kwargs is not None:
+                    return kwargs
+        return {}
 
 
     def run_udf(self, inputs, function, error_on_different_length_tuple = False):
@@ -39,11 +55,16 @@ class CascadingTestCase(unittest.TestCase):
         else:
             input_tuples.append(cascading.tuple.Tuple(inputs))
 
+
         real_fun = self.unwrap_function(function)
+       
         produces = self.get_produces(function)
+        args = self.get_args(function)
+        kwargs = self.get_kwargs(function)
         outputs = []
         for input_tuple in input_tuples:
-            ret = real_fun(input_tuple)
+            cur_args = (input_tuple,) + args
+            ret = real_fun(*cur_args, **kwargs)
             if isinstance(ret, types.GeneratorType):
                 for output in ret:
                     outputs.append(validate_truncate_output(produces, output))
