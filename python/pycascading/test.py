@@ -132,68 +132,104 @@ class CascadingTestCase(unittest.TestCase):
         return CascadingTestCase.run_flow(gen_flow, input_str)
     
     @staticmethod
+    def _dump_to_path(path, input):
+        #Take the input data received and write it to a temp input file to be read later
+        input_filename = "%s/input_file" % (path)
+        f = open(input_filename, "wb")
+        if isinstance(input, str):
+            f.write(input)
+        elif isinstance(input, list):
+            for line in input:
+                first = True
+                for field in line:
+                    if first == False:
+                        f.write("\t")
+                    first = False
+                    if field is not None:
+                        f.write(str(field))
+                f.write('\n')
+            #Presume a list of lists containing all the rows..
+        else:
+            raise Exception("Unable to understand test input")
+        f.close()
+        return input_filename
+
+    @staticmethod
+    def _parse_output_data(output_path, deserialize_output = False):
+        produced_output_str = ""
+        for output_file_name in os.listdir(output_path):
+            if output_file_name.startswith("part-"):
+                f = open("%s/%s" % (output_path, output_file_name), "rb")
+                produced_output_str += f.read().strip()
+                f.close()
+        if not deserialize_output:
+            return produced_output_str
+        else: #It was a list, lets try give back a list
+            raw_types = open("%s/.pycascading_types" % (output_path), "rb").read().strip().split("\n")
+            types = [s.split("\t")[1].strip() for s in raw_types]
+            names = [s.split("\t")[0].strip() for s in raw_types]
+            lines = produced_output_str.split("\n")
+            output = []
+            for line in lines:
+                cur_line = []
+                segments = line.split("\t")
+                if len(segments) != len(types):
+                    raise Exception("Unknown error, types and results should match.")
+                for idx in range(len(types)):
+                    if types[idx] == "java.lang.String":
+                        cur_line.append(segments[idx])
+                    elif types[idx] == "java.lang.Double":
+                        cur_line.append(float(segments[idx]))
+                    elif types[idx] == "java.lang.Float":
+                        cur_line.append(float(segments[idx]))
+                    elif types[idx] == "java.lang.Integer":
+                        cur_line.append(int(segments[idx]))
+                    elif types[idx] == "java.lang.Long":
+                        cur_line.append(long(segments[idx]))
+                    else:
+                        raise Exception("Don't know how to handle type : " + str([types[idx]]))
+                output.append(cur_line)
+            return (names, output)
+
+    @staticmethod
     def run_flow(gen_flow, input):
         temp_directory = tempfile.mkdtemp()
         try:
-            #Take the input data received and write it to a temp input file to be read later
-            input_filename = "%s/input_file" % (temp_directory)
-            f = open(input_filename, "wb")
-            if isinstance(input, str):
-                f.write(input)
-            elif isinstance(input, list):
-                for line in input:
-                    first = True
-                    for field in line:
-                        if first == False:
-                            f.write("\t")
-                        first = False
-                        f.write(str(field))
-                    f.write('\n')
-                #Presume a list of lists containing all the rows..
-            else:
-                raise Exception("Unable to understand test input")
-            f.close()
+            input_filename = CascadingTestCase._dump_to_path(temp_directory, input)
             #Generate the output path
             output_path = "%s/out_dir" % (temp_directory)
             flow = gen_flow(input_filename, output_path)
             assert(isinstance(flow, Flow))
             flow.run(num_reducers=1)
-            produced_output_str = ""
-            for output_file_name in os.listdir(output_path):
-                if output_file_name.startswith("part-"):
-                    f = open("%s/%s" % (output_path, output_file_name), "rb")
-                    produced_output_str += f.read().strip()
-                    f.close()
+            
             if isinstance(input, str):
-                return produced_output_str
-            else: #It was a list, lets try give back a list
-                raw_types = open("%s/.pycascading_types" % (output_path), "rb").read().strip().split("\n")
-                types = [s.split("\t")[1].strip() for s in raw_types]
-                names = [s.split("\t")[0].strip() for s in raw_types]
-                lines = produced_output_str.split("\n")
-                output = []
-                for line in lines:
-                    cur_line = []
-                    segments = line.split("\t")
-                    if len(segments) != len(types):
-                        raise Exception("Unknown error, types and results should match.")
-                    for idx in range(len(types)):
-                        if types[idx] == "java.lang.String":
-                            cur_line.append(segments[idx])
-                        elif types[idx] == "java.lang.Double":
-                            cur_line.append(float(segments[idx]))
-                        elif types[idx] == "java.lang.Float":
-                            cur_line.append(float(segments[idx]))
-                        elif types[idx] == "java.lang.Integer":
-                            cur_line.append(int(segments[idx]))
-                        elif types[idx] == "java.lang.Long":
-                            cur_line.append(long(segments[idx]))
-                        else:
-                            raise Exception("Don't know how to handle type : " + str([types[idx]]))
-                    output.append(cur_line)
-                return (names, output)
+                return CascadingTestCase._parse_output_data(output_path)
+            else:
+                return CascadingTestCase._parse_output_data(output_path, deserialize_output = True)
         finally:
             shutil.rmtree(temp_directory)
+    
+    @staticmethod
+    def run_multi_flow(gen_flow_list, input):
+        temp_directory = tempfile.mkdtemp()
+        try:
+            input_filename = CascadingTestCase._dump_to_path(temp_directory, input)
+            #Generate the output path
+            output_path = "%s/out_dir" % (temp_directory)
+            intermediate_root = "%s/intermediates/" %(temp_directory)
+            os.mkdir(intermediate_root)
+            assert(isinstance(gen_flow_list, list))
+            for gen_flow in gen_flow_list:
+                flow = gen_flow(input_filename, intermediate_root, output_path)
+                assert(isinstance(flow, Flow))
+                flow.run(num_reducers=1)
+            if isinstance(input, str):
+                return CascadingTestCase._parse_output_data(output_path)
+            else:
+                return CascadingTestCase._parse_output_data(output_path, deserialize_output = True)
+        finally:
+            #shutil.rmtree(temp_directory)
+            pass
     
     @staticmethod
     def in_out_run_flow(flow_generator_function, input_str):
