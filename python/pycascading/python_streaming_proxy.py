@@ -87,6 +87,9 @@ def get_user_function(function_path):
         last_dot = string.rfind(function_module_path, ".")
         module = function_module_path[0: last_dot]
         first_dot = string.find(module, ".")
+        if first_dot < 0:
+            # Then we are of the form module.function at the top level, so first dot = last dot
+            first_dot = last_dot
         function_path = function_module_path[first_dot +1:]
         return (module, function_path)
     
