@@ -39,6 +39,33 @@ class CascadingTestCase(unittest.TestCase):
         return {}
 
 
+    def run_filter(self, inputs, function, error_on_different_length_tuple = False):
+        def validate_truncate_output(output):
+            self.assertTrue(isinstance(output,bool))
+            return output
+        assert(isinstance(inputs, list))
+        input_tuples = []
+        if len(inputs) > 0 and isinstance(inputs[0], list):
+            for raw_tuple in inputs:
+                input_tuples.append(cascading.tuple.Tuple(raw_tuple))
+        else:
+            input_tuples.append(cascading.tuple.Tuple(inputs))
+
+
+        real_fun = self.unwrap_function(function)
+        args = self.get_args(function)
+        kwargs = self.get_kwargs(function)
+        outputs = []
+        for input_tuple in input_tuples:
+            cur_args = (input_tuple,) + args
+            ret = real_fun(*cur_args, **kwargs)
+            if isinstance(ret, types.GeneratorType):
+                for output in ret:
+                    outputs.append(validate_truncate_output(output))
+            else:
+                outputs.append(validate_truncate_output(ret))
+        return outputs
+
     def run_udf(self, inputs, function, error_on_different_length_tuple = False):
         def validate_truncate_output(produces, output):
             self.assertTrue(isinstance(output,list))
