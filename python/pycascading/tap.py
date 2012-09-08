@@ -98,6 +98,23 @@ class Flow(object):
         self._connect_source(p.get_assembly().getName(), cascading_tap)
         return p
 
+    def tsv_meta_source(self, input_path):
+        """Use data files in a folder and read the scheme from the meta file.
+           requires the source be a TextDelimited meta_source so we can
+           set the types correctly
+
+        Defines a source tap using files in input_path, which should be a
+        (HDFS) folder. Takes care of using the appropriate scheme that was
+        used to store the data, using meta data in the data folder.
+
+        Arguments:
+        input_path -- the HDFS folder to store data into
+        """
+
+        input_path = expand_path_with_home(input_path)
+        source_scheme = MetaScheme.getSourceTSVScheme(input_path)
+        return self.source(cascading.tap.hadoop.Hfs(source_scheme, input_path))
+
     def meta_source(self, input_path):
         """Use data files in a folder and read the scheme from the meta file.
 

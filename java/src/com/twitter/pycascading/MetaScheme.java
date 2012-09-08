@@ -34,6 +34,7 @@ import cascading.scheme.SourceCall;
 import cascading.tap.Tap;
 import cascading.tuple.Fields;
 import cascading.tuple.TupleEntry;
+import cascading.scheme.hadoop.TextDelimited;
 
 /**
  * A Cascading Scheme that stores header information for an output dataset. It
@@ -56,6 +57,37 @@ public class MetaScheme extends Scheme<JobConf, RecordReader, OutputCollector, O
   private String outputPath;
   private boolean firstLine = true;
   private boolean typeFileToWrite = true;
+
+
+    /**
+   * Call to create a cascading scheme based on the outputted types
+   * in the binary scheme side along side the meta output.
+   * 
+   * @param inputPath
+   *          The path to where the scheme information was stored (normally the
+   *          same as the path to the data)
+   * @return The Cascading scheme that was used when the data was written.
+   * @throws IOException
+   */
+  public static Scheme getSourceTSVScheme(String inputPath) throws IOException {
+    Path path = new Path(inputPath + "/" + schemeFileName);
+    FileSystem fs = path.getFileSystem(new Configuration());
+    try {
+      FSDataInputStream file = fs.open(path);
+      ObjectInputStream ois = new ObjectInputStream(file);
+      ois.readObject(); // Read the scheme, we don't use it
+      Fields fields = (Fields) ois.readObject();      
+      Class[] types = (Class[])ois.readObject();
+
+      Scheme scheme = new TextDelimited(fields, "\t", types);
+      ois.close();
+      file.close();
+      return scheme;
+    } catch (ClassNotFoundException e) {
+      throw new IOException("Could not read PyCascading file header: " + inputPath + "/"
+              + schemeFileName);
+    }
+  }
 
   /**
    * Call this to get the original Cascading scheme that the data was written
@@ -162,6 +194,7 @@ public class MetaScheme extends Scheme<JobConf, RecordReader, OutputCollector, O
           ObjectOutputStream ostream = new ObjectOutputStream(stream);
           ostream.writeObject(scheme);
           ostream.writeObject(tupleEntry.getFields());
+          ostream.writeObject(tupleEntry.getTuple().getTypes());
           ostream.close();
           stream.close();
         }
