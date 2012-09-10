@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.6
+#!/usr/bin/env python
 
 import sys
 import site
@@ -51,9 +51,9 @@ lockModule.LockFile = LockFile
 def install_with_easy_install(packages):
     with LockFile("/tmp/easy_install_ops3.lock"):
         import subprocess
-        subprocess.check_call("sudo easy_install-2.6 -U distribute", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.check_call("sudo easy_install -U distribute", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         for pkg in packages:
-            subprocess.check_call("sudo easy_install-2.6 -U %s" % (pkg), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.check_call("sudo easy_install -U %s" % (pkg), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             reload(site) # Reload often incase more downstream needs it
 
 try:
