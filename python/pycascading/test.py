@@ -235,7 +235,7 @@ class CascadingTestCase(unittest.TestCase):
                 return CascadingTestCase._parse_output_data(output_path, deserialize_output = True)
         finally:
             shutil.rmtree(temp_directory)
-    
+
     @staticmethod
     def run_multi_flow(gen_flow_list, input):
         temp_directory = tempfile.mkdtemp()
@@ -255,8 +255,7 @@ class CascadingTestCase(unittest.TestCase):
             else:
                 return CascadingTestCase._parse_output_data(output_path, deserialize_output = True)
         finally:
-            #shutil.rmtree(temp_directory)
-            pass
+            shutil.rmtree(temp_directory)
     
     @staticmethod
     def in_out_run_flow(flow_generator_function, input_str):
