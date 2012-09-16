@@ -45,8 +45,32 @@ class LockFile(object):
     def __exit__(self, type, value, tb):
         self.__file.close()
         os.unlink(self.__lockfile)
-
 lockModule.LockFile = LockFile
+
+tuple_module = new.module("Tuple")
+sys.modules["Tuple"] = tuple_module
+
+
+class Tuple(object):
+
+    def __init__(self, args):
+        self.__args = args
+
+    def get(self,indx):
+        return self.__args[indx]
+
+    def size(self):
+        return len(self.__args)
+
+    def __len__(self):
+        return len(self.__args)
+
+    def __iter__(self):
+        return self.__args.__iter__()
+tuple_module.Tuple = Tuple
+
+
+
 
 def install_with_easy_install(packages):
     with LockFile("/tmp/easy_install_ops3.lock"):
@@ -103,20 +127,8 @@ def get_user_function(function_path):
 
 user_function = get_user_function(args.function)
 
-base_fields = None
-class Tuple(object):
-    def __init__(self, args):
-        self.__args = args
-    def get(self,indx):
-        return self.__args[indx]
-    def size(self):
-        return len(self.__args)
-    def __len__(self):
-        return len(self.__args)
-    def __iter__(self):
-        return self.__args.__iter__()
 
-
+from Tuple import Tuple
 
 # input comes from STDIN (standard input)
 line = stdin.readline()
