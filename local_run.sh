@@ -64,6 +64,6 @@ if [ "$additional_jars" != "" ]; then
 fi
 
 # sys.path will be initialized from JYTHONPATH
-java -Xmx512m -classpath "$classpath" \
+java -Xmx512m $JAVA_OPTS -classpath "$classpath" \
 com.twitter.pycascading.Main "$home_dir/python/pycascading/bootstrap.py" \
 local "$home_dir" "$@"
