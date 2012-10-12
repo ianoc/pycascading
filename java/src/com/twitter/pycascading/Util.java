@@ -113,7 +113,7 @@ public class Util {
     System.setProperty("pycascading.root", root);
   }
 
-  public static void run(String name, int numReducers, Map<String, Object> config, Map<String, Tap> sources,
+  public static void run(String name, int numReducers, Long minSplitSize,  Map<String, Object> config, Map<String, Tap> sources,
           Map<String, Tap> sinks, Pipe... tails) throws IOException, URISyntaxException {
     // String strClassPath = System.getProperty("java.class.path");
     // System.out.println("Classpath is " + strClassPath);
@@ -124,6 +124,8 @@ public class Util {
     // Set this to change the default block size that is routed to one mapper
     // It won't help if the files are smaller than this as each file will go to
     // one mapper
+
+    properties.put("mapred.min.split.size", new Long(minSplitSize).toString());
     // properties.put("mapred.min.split.size", 20 * 1024 * 1024 * 1024L);
     // properties.put("mapred.map.tasks", 4000);
     // So that Thrift classes can be serialized

@@ -225,7 +225,7 @@ class Flow(object):
         
         return source_map
 
-    def run(self, name="pycascading flow", num_reducers=50, config=None):
+    def run(self, name="pycascading flow", num_reducers=50, min_split_size=0, config=None):
         """Start the Cascading job.
 
         We call this when we are done building the pipeline and explicitly want
@@ -234,7 +234,7 @@ class Flow(object):
         source_map = self.__get_active_sources()
         tails = [t.get_assembly() for t in self.tails]
         import pycascading.pipe
-        Util.run(name, num_reducers, pycascading.pipe.config, source_map, \
+        Util.run(name, num_reducers, min_split_size, pycascading.pipe.config, source_map, \
                  self.sink_map, tails)
         
     def writeDOT(self, filename):
