@@ -237,6 +237,34 @@ class CascadingTestCase(unittest.TestCase):
             shutil.rmtree(temp_directory)
 
     @staticmethod
+    def run_flow_with_multiple_inputs_and_outputs(gen_flow, input_list, num_of_outputs):
+        temp_directories = []
+        for idx in range(len(input_list)):
+            temp_directories.append(tempfile.mkdtemp())
+        try:
+            input_filenames = []
+            for idx in range(len(input_list)):
+                input_filenames.append(CascadingTestCase._dump_to_path(temp_directories[idx], input_list[idx]))
+            #Generate the output path
+            output_paths = []
+            for idx in range(num_of_outputs):
+                tempfolder = tempfile.mkdtemp()
+                output_paths.append(tempfolder)
+                temp_directories.append(tempfolder)
+            flow = gen_flow(input_filenames, output_paths)
+            assert(isinstance(flow, Flow))
+            flow.run(num_reducers=1)
+
+            result_tuple = ()
+            for idx in range(num_of_outputs):
+                output = output_paths[idx]
+                result_tuple = result_tuple + (CascadingTestCase._parse_output_data(output, deserialize_output = True))
+            return result_tuple
+        finally:
+            for idx in range(len(input_list)):
+                shutil.rmtree(temp_directories[idx])
+
+    @staticmethod
     def run_multi_flow(gen_flow_list, input):
         temp_directory = tempfile.mkdtemp()
         try:
@@ -260,4 +288,9 @@ class CascadingTestCase(unittest.TestCase):
     @staticmethod
     def in_out_run_flow(flow_generator_function, input_str):
         return CascadingTestCase.run_flow(flow_generator_function, input_str)
+
+    @staticmethod
+    def run_flow_with_multiple_in_out(flow_generator_function, input_list, num_of_outputs):
+        return CascadingTestCase.run_flow_with_multiple_inputs_and_outputs(flow_generator_function, input_list,
+                                                                                num_of_outputs)
 
