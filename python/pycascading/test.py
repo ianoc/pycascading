@@ -237,6 +237,34 @@ class CascadingTestCase(unittest.TestCase):
             shutil.rmtree(temp_directory)
 
     @staticmethod
+    def run_flow_with_multiple_inputs_and_outputs(gen_flow, input_list, num_of_outputs):
+        temp_directories = []
+        for idx in range(len(input_list)):
+            temp_directories.append(tempfile.mkdtemp())
+        try:
+            input_filenames = []
+            for idx in range(len(input_list)):
+                input_filenames.append(CascadingTestCase._dump_to_path(temp_directories[idx], input_list[idx]))
+            #Generate the output path
+            output_paths = []
+            for idx in range(num_of_outputs):
+                tempfolder = tempfile.mkdtemp()
+                output_paths.append(tempfolder)
+                temp_directories.append(tempfolder)
+            flow = gen_flow(input_filenames, output_paths)
+            assert(isinstance(flow, Flow))
+            flow.run(num_reducers=1)
+
+            result_list = []
+            for idx in range(num_of_outputs):
+                output = output_paths[idx]
+                result_list.append(CascadingTestCase._parse_output_data(output, deserialize_output = True))
+            return result_list
+        finally:
+            for idx in range(len(input_list)):
+                shutil.rmtree(temp_directories[idx])
+
+    @staticmethod
     def run_multi_flow(gen_flow_list, input):
         temp_directory = tempfile.mkdtemp()
         try:
@@ -260,4 +288,43 @@ class CascadingTestCase(unittest.TestCase):
     @staticmethod
     def in_out_run_flow(flow_generator_function, input_str):
         return CascadingTestCase.run_flow(flow_generator_function, input_str)
+
+    @staticmethod
+    def run_flow_with_multiple_in_out(flow_generator_function, input_list, num_of_outputs):
+        """
+        This test API can be used to test flow which takes multiple input files and/or generate
+        multiple outputs.  Parameters and example are listed as follows.
+
+        Parameters:
+            flow_generator_function:  The flow_gen function which takes a list of input file names
+                                      and a list of output file names.  Flow_gen() returns a Flow.
+            input_list:               Array of inputs.  Each input in this array contain the content
+                                      that will be stored in the corresponding input file.
+            num_of_outputs:           Number of outputs that will be returned in an array by this API.
+
+        Example:
+
+            import ... ...
+            class Tests(CascadingTestCase):
+                def test_example(self):
+                    def gen_flow(sources, dests):
+                        flow = Flow()
+                        output_0 = flow.tsv_sink(dests[0])
+                        raw_src_0 = flow.source(Hfs(TextLine(), sources[0]))
+                        fields = ["product_name", "product_id"]
+                        types = [String, Integer]
+                        output_1 = flow.tsv_sink(dests[1])
+                        raw_src_1 = flow.source(Hfs(TextDelimited(Fields(fields, '\t', types), sources[1])
+                        my_function(raw_src_0, raw_src_1, output_0, output_1)
+                        return flow
+                    input0 = ["a, b\nc, d"]
+                    input1 = [["a", 1],["c", 100]]
+                    inputs = [input0, input1]
+                    results = self.run_flow_with_multiple_in_out(gen_flow, inputs, 2)
+                    # results[0] maps to output_0
+                    # results[1] maps to output_1
+                    ... ...
+        """
+        return CascadingTestCase.run_flow_with_multiple_inputs_and_outputs(flow_generator_function, input_list,
+                                                                                num_of_outputs)
 
