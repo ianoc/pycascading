@@ -255,11 +255,11 @@ class CascadingTestCase(unittest.TestCase):
             assert(isinstance(flow, Flow))
             flow.run(num_reducers=1)
 
-            result_tuple = []
+            result_list = []
             for idx in range(num_of_outputs):
                 output = output_paths[idx]
-                result_tuple.append(CascadingTestCase._parse_output_data(output, deserialize_output = True))
-            return result_tuple
+                result_list.append(CascadingTestCase._parse_output_data(output, deserialize_output = True))
+            return result_list
         finally:
             for idx in range(len(input_list)):
                 shutil.rmtree(temp_directories[idx])
