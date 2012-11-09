@@ -258,7 +258,7 @@ class CascadingTestCase(unittest.TestCase):
             result_tuple = []
             for idx in range(num_of_outputs):
                 output = output_paths[idx]
-                result_tuple = append(CascadingTestCase._parse_output_data(output, deserialize_output = True))
+                result_tuple.append(CascadingTestCase._parse_output_data(output, deserialize_output = True))
             return result_tuple
         finally:
             for idx in range(len(input_list)):
