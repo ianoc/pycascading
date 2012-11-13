@@ -20,8 +20,9 @@ __author__ = 'Gabor Szabo'
 
 import cascading.pipe
 import cascading.operation
-
-from pycascading.pipe import Operation, coerce_to_fields, _Stackable
+from pycascading.operators import rename
+import cascading.pipe.assembly.Discard
+from pycascading.pipe import Operation, coerce_to_fields, _Stackable, random_pipe_name
 
 
 class CoGroup(Operation):
@@ -62,7 +63,7 @@ class CoGroup(Operation):
                       rhs=None, rhs_group_fields=None,name=None):
         if name is not None and group_name is None:
             group_name = name
-        
+        self.__to_discard_fields = []
         # We can use an unnamed parameter only for group_fields
         if self.__args:
             group_fields = [coerce_to_fields(f) for f in self.__args[0]]
@@ -81,9 +82,29 @@ class CoGroup(Operation):
             if joiner:
                 args.append(joiner)
         elif pipes:
-            args.append([p.get_assembly() for p in pipes])
             if group_fields:
-                args.append([coerce_to_fields(f) for f in group_fields])
+                group_fields = [coerce_to_fields(f) for f in group_fields]
+                new_group_fields = [group_fields[0]]
+                # So we expect an array of arrays which contain the fields
+                # as the group fields
+                # If there are duplicates we need to do some rename magic
+
+                primary_fields = group_fields[0]
+                for indx in range(1, len(group_fields)):
+                    current = group_fields[indx]
+                    new_names = []
+                    for indy in range(current.size()):
+                        if declared_fields is None and primary_fields.get(indy) == current.get(indy):
+                            print(primary_fields.get(indy) + "_DELETE_ME")
+                            pipes[indx] |= rename(str(primary_fields.get(indy)), str(primary_fields.get(indy) + "_DELETE_ME"))
+                            new_names.append(str(primary_fields.get(indy) + "_DELETE_ME"))
+                            self.__to_discard_fields.append(str(primary_fields.get(indy) + "_DELETE_ME"))
+                        else:
+                            new_names.append(str(current.get(indy)))
+                    new_group_fields.append(coerce_to_fields(new_names))
+
+                args.append([p.get_assembly() for p in pipes])
+                args.append([coerce_to_fields(f) for f in new_group_fields])
                 if declared_fields:
                     args.append(coerce_to_fields(declared_fields))
                     if result_group_fields:
@@ -93,6 +114,8 @@ class CoGroup(Operation):
                 if joiner is None:
                     joiner = cascading.pipe.joiner.InnerJoin()
                 args.append(joiner)
+            else:
+                args.append([p.get_assembly() for p in pipes])
         elif pipe:
             args.append(pipe.get_assembly())
             args.append(coerce_to_fields(group_fields))
@@ -103,6 +126,7 @@ class CoGroup(Operation):
                     args.append(coerce_to_fields(result_group_fields))
             if joiner:
                 args.append(joiner)
+        print(args)
         return args
 
     def _create_with_parent(self, parent):
@@ -110,7 +134,13 @@ class CoGroup(Operation):
             args = self.__create_args(pipes=parent.stack, **self.__kwargs)
         else:
             args = self.__create_args(pipe=parent, **self.__kwargs)
-        return cascading.pipe.CoGroup(*args)
+
+        cogroup = cascading.pipe.CoGroup(*args)
+        if len(self.__to_discard_fields) > 0:
+            p = cascading.pipe.Pipe(random_pipe_name("Cogroup"), cogroup)
+            return cascading.pipe.assembly.Discard(p, coerce_to_fields(self.__to_discard_fields) )
+        else:
+            return cogroup
 
 
 def inner_join(*args, **kwargs):

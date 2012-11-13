@@ -21,7 +21,7 @@ class CascadingTestCase(unittest.TestCase):
             if 'produces' in wrapped_function.decorators:
                 return wrapped_function.decorators['produces']
         return None
-    
+
     def get_args(self, wrapped_function):
         if isinstance(wrapped_function, DecoratedFunction):
             if 'args' in wrapped_function.decorators:
@@ -29,7 +29,7 @@ class CascadingTestCase(unittest.TestCase):
                 if args is not None:
                     return args
         return ()
-    
+
     def get_kwargs(self, wrapped_function):
         if isinstance(wrapped_function, DecoratedFunction):
             if 'kwargs' in wrapped_function.decorators:
@@ -84,7 +84,7 @@ class CascadingTestCase(unittest.TestCase):
 
 
         real_fun = self.unwrap_function(function)
-       
+
         produces = self.get_produces(function)
         args = self.get_args(function)
         kwargs = self.get_kwargs(function)
@@ -111,16 +111,16 @@ class CascadingTestCase(unittest.TestCase):
                 input_path = mapping[source_path]
             elif '*' in mapping:
                 input_path = mapping['*']
-            
+
             if input_path is not None:
                 input_tap = Hfs(scheme, input_path)
                 replacement_values[key] = input_tap
                 ret_map[source_path] = input_tap
-            
+
         for key,val in replacement_values.iteritems():
             flow.source_map[key] = val
         return ret_map
-    
+
     @staticmethod
     def remap_flow_sinks(flow, path = None, mapping={}):
         replacement_values = {}
@@ -141,13 +141,13 @@ class CascadingTestCase(unittest.TestCase):
                 new_tap = cascading.tap.hadoop.Hfs(sink_scheme, output_path, cascading.tap.SinkMode.REPLACE)
                 replacement_values[key] = new_tap
                 ret_map[orig_out_path] = output_path
-            
+
         for key,val in replacement_values.iteritems():
             flow.sink_map[key] = val
         return ret_map
-    
 
-        
+
+
     @staticmethod
     def map_run_flow(user_flow, input_str):
         assert(isinstance(user_flow, Flow))
@@ -155,9 +155,9 @@ class CascadingTestCase(unittest.TestCase):
             CascadingTestCase.remap_flow_sources(user_flow, mapping = {'*': input_path})
             CascadingTestCase.remap_flow_sinks(user_flow, mapping = {'*' : output_path } )
             return user_flow
-            
+
         return CascadingTestCase.run_flow(gen_flow, input_str)
-    
+
     @staticmethod
     def _dump_to_path(path, input):
         #Take the input data received and write it to a temp input file to be read later
@@ -228,7 +228,7 @@ class CascadingTestCase(unittest.TestCase):
             flow = gen_flow(input_filename, output_path)
             assert(isinstance(flow, Flow))
             flow.run(num_reducers=1)
-            
+
             if isinstance(input, str):
                 return CascadingTestCase._parse_output_data(output_path)
             else:
@@ -284,7 +284,7 @@ class CascadingTestCase(unittest.TestCase):
                 return CascadingTestCase._parse_output_data(output_path, deserialize_output = True)
         finally:
             shutil.rmtree(temp_directory)
-    
+
     @staticmethod
     def in_out_run_flow(flow_generator_function, input_str):
         return CascadingTestCase.run_flow(flow_generator_function, input_str)
@@ -327,4 +327,3 @@ class CascadingTestCase(unittest.TestCase):
         """
         return CascadingTestCase.run_flow_with_multiple_inputs_and_outputs(flow_generator_function, input_list,
                                                                                 num_of_outputs)
-
