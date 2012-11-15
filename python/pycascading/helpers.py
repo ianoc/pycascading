@@ -44,6 +44,7 @@ from pycascading.operators import *
 from pycascading.each import *
 from pycascading.every import *
 from pycascading.cogroup import *
+from pycascading.hashjoin import *
 # We don't import * as the name of some functions (sum) collides with Python
 import pycascading.native as native
 
