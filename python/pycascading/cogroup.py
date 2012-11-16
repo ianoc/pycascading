@@ -126,7 +126,6 @@ class CoGroup(Operation):
                     args.append(coerce_to_fields(result_group_fields))
             if joiner:
                 args.append(joiner)
-        print(args)
         return args
 
     def _create_with_parent(self, parent):
