@@ -272,6 +272,11 @@ class _Composed(MetaChain):
         self.__args = args
         self.__kwargs = kwargs
     
+    def __call__(self, *args, **kwargs):
+        assert(len(args) == 0)
+        self.__kwargs.update(kwargs)
+        return self
+
     def proxy(self, *args):
       self.__args = (args) + self.__args
       return self.func (*self.__args, **self.__kwargs)
