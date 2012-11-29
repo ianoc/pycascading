@@ -53,12 +53,16 @@ class HashJoin(Operation):
                       pipes=None, declared_fields=None,
                       joiner=None,
                       pipe=None, num_self_joins=None,
-                      name=None):
+                      name=None, group_fields=None):
         self.__to_discard_fields = []
         # We can use an unnamed parameter only for group_fields
         if self.__args:
             group_fields = [coerce_to_fields(f) for f in self.__args[0]]
         args = []
+        if len(pipes) == 1:
+            pipe = pipes[0]
+            pipes = None
+
         if pipes:
             if group_fields:
                 group_fields = [coerce_to_fields(f) for f in group_fields]
