@@ -29,7 +29,7 @@ from pycascading.pipe import Operation, coerce_to_fields, _Stackable, random_pip
 def merge_tuples(tup, num_elements):
     for indx in range(num_elements):
         current = tup.get(indx)
-        if current not None:
+        if current is not None:
             return current
     return None
 
