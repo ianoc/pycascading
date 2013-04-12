@@ -169,7 +169,7 @@ class _Stackable(object):
 class MetaChain(object):
     def proxy(self, proxy):
         raise Exception("Proxy must be defined in a meta chain class.")
-        
+
 class Chainable(_Stackable):
 
     """An object that can be chained with '|' operations."""
@@ -265,6 +265,22 @@ class Pipe(Chainable):
         of a chain.
         """
         return cascading.pipe.Pipe(self.__name, parent.get_assembly())
+
+class PipeWithParent(Chainable):
+    def __init__(self, parent):
+        Chainable.__init__(self)
+        self.__parent = parent
+
+    def _create_without_parent(self):
+        """
+        Create the Cascading operation when this is the first element of a
+        chain.
+        """
+        return cascading.pipe.Pipe(self.__name, self.__parent.get_assembly())
+
+    def toNative(self):
+        return self._create_without_parent()
+
 
 
 class Operation(Chainable):

@@ -26,7 +26,7 @@ from pycascading.pipe import Operation, coerce_to_fields, _Stackable, random_pip
 
 from pycascading.decorators import udf_map
 from pycascading.each import map_replace
-
+from pycascading.pipe import PipeWithParent
 
 @udf_map
 def merge_tuples(tup, num_elements):
@@ -150,10 +150,10 @@ class CoGroup(Operation):
 
         cogroup = cascading.pipe.CoGroup(*args)
         if len(self.__to_discard_fields) > 0:
-            p = cascading.pipe.Pipe(random_pipe_name("Cogroup"), cogroup)
+            p = PipeWithParent(cogroup)
             for outputName, mergeVectors in self.__to_discard_fields.iteritems():
                     p = p | map_replace(mergeVectors, merge_tuples, outputName)
-            return p
+            return p.toNative
         else:
             return cogroup
 
