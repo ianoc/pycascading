@@ -25,6 +25,14 @@ import cascading.pipe.assembly.Discard
 from pycascading.pipe import Operation, coerce_to_fields, _Stackable, random_pipe_name
 
 
+@udf_map
+def merge_tuples(tup, num_elements):
+    for indx in range(num_elements):
+        current = tup.get(indx)
+        if current not None:
+            return current
+    return None
+
 class CoGroup(Operation):
 
     """CoGroup two or more streams on common fields.
@@ -95,10 +103,13 @@ class CoGroup(Operation):
                     new_names = []
                     for indy in range(current.size()):
                         if declared_fields is None and primary_fields.get(indy) == current.get(indy):
-                            new_field_name = "%s_DELETE_ME_%d" % (str(primary_fields.get(indy)), indx)
-                            pipes[indx] |= rename(str(primary_fields.get(indy)), new_field_name)
+                            cur_field_name = str(primary_fields.get(indy)
+                            new_field_name = "%s_DELETE_ME_%d" % (cur_field_name, indx)
+                            pipes[indx] |= rename(cur_field_name, new_field_name)
                             new_names.append(new_field_name)
-                            self.__to_discard_fields.append(new_field_name)
+                            if cur_field_name not in self.__to_discard_fields:
+                                self.__to_discard_fields[cur_field_name] = {}
+                            self.__to_discard_fields[cur_field_name].append(new_field_name)
                         else:
                             new_names.append(str(current.get(indy)))
                     new_group_fields.append(coerce_to_fields(new_names))
@@ -137,7 +148,9 @@ class CoGroup(Operation):
         cogroup = cascading.pipe.CoGroup(*args)
         if len(self.__to_discard_fields) > 0:
             p = cascading.pipe.Pipe(random_pipe_name("Cogroup"), cogroup)
-            return cascading.pipe.assembly.Discard(p, coerce_to_fields(self.__to_discard_fields) )
+            for outputName, mergeVectors in self.__to_discard_fields.iteritems:
+                    p = p | map_replace(mergeVectors, merge_tuples, outputName)
+            return p
         else:
             return cogroup
 
