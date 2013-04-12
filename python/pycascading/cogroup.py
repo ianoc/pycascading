@@ -103,7 +103,7 @@ class CoGroup(Operation):
                     new_names = []
                     for indy in range(current.size()):
                         if declared_fields is None and primary_fields.get(indy) == current.get(indy):
-                            cur_field_name = str(primary_fields.get(indy)
+                            cur_field_name = str(primary_fields.get(indy))
                             new_field_name = "%s_DELETE_ME_%d" % (cur_field_name, indx)
                             pipes[indx] |= rename(cur_field_name, new_field_name)
                             new_names.append(new_field_name)
