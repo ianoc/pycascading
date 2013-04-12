@@ -25,6 +25,7 @@ import cascading.pipe.assembly.Discard
 from pycascading.pipe import Operation, coerce_to_fields, _Stackable, random_pipe_name
 
 from pycascading.decorators import udf_map
+from pycascading.each import map_replace
 
 
 @udf_map
