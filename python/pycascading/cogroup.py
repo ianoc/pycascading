@@ -150,7 +150,7 @@ class CoGroup(Operation):
         cogroup = cascading.pipe.CoGroup(*args)
         if len(self.__to_discard_fields) > 0:
             p = cascading.pipe.Pipe(random_pipe_name("Cogroup"), cogroup)
-            for outputName, mergeVectors in self.__to_discard_fields.iteritems:
+            for outputName, mergeVectors in self.__to_discard_fields.iteritems():
                     p = p | map_replace(mergeVectors, merge_tuples, outputName)
             return p
         else:
