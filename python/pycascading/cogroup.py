@@ -73,7 +73,7 @@ class CoGroup(Operation):
                       rhs=None, rhs_group_fields=None,name=None):
         if name is not None and group_name is None:
             group_name = name
-        self.__to_discard_fields = []
+        self.__to_discard_fields = {}
         # We can use an unnamed parameter only for group_fields
         if self.__args:
             group_fields = [coerce_to_fields(f) for f in self.__args[0]]
@@ -110,7 +110,7 @@ class CoGroup(Operation):
                             pipes[indx] |= rename(cur_field_name, new_field_name)
                             new_names.append(new_field_name)
                             if cur_field_name not in self.__to_discard_fields:
-                                self.__to_discard_fields[cur_field_name] = {}
+                                self.__to_discard_fields[cur_field_name] = []
                             self.__to_discard_fields[cur_field_name].append(new_field_name)
                         else:
                             new_names.append(str(current.get(indy)))
