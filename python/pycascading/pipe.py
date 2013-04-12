@@ -269,14 +269,14 @@ class Pipe(Chainable):
 class PipeWithParent(Chainable):
     def __init__(self, parent):
         Chainable.__init__(self)
-        self.__parent = parent
+        self.__raw_parent = parent
 
     def _create_without_parent(self):
         """
         Create the Cascading operation when this is the first element of a
         chain.
         """
-        return cascading.pipe.Pipe('unnamed', self.__parent.get_assembly())
+        return cascading.pipe.Pipe('unnamed', self.__raw_parent)
 
     def toNative(self):
         return self._create_without_parent()
