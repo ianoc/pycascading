@@ -153,8 +153,8 @@ class CoGroup(Operation):
             p = PipeWithParent(cogroup)
             for outputName, mergeVectors in self.__to_discard_fields.iteritems():
                     p = p | map_replace(mergeVectors, merge_tuples, outputName)
-            p = PipeWithParent(p)
-            return p.toNative
+#            p = PipeWithParent(p)
+            return p
         else:
             return cogroup
 
