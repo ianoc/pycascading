@@ -276,7 +276,7 @@ class PipeWithParent(Chainable):
         Create the Cascading operation when this is the first element of a
         chain.
         """
-        return cascading.pipe.Pipe(self.__name, self.__parent.get_assembly())
+        return cascading.pipe.Pipe('unnamed', self.__parent.get_assembly())
 
     def toNative(self):
         return self._create_without_parent()
